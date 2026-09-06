@@ -44,6 +44,43 @@ async function runCachingAndDraftTests() {
   }
   console.log(`  ✓ All questions metadata verified (${allQData.questions.length} department questionnaires)`);
 
+  // Test 4: Draft Store Offline Persistence & Revision Conflict Resolution
+  console.log("Test 4: Validating Draft Store offline persistence & revision resolution...");
+  const mockStorage = new Map();
+  global.window = {
+    localStorage: {
+      getItem: (k) => mockStorage.get(k) || null,
+      setItem: (k, v) => mockStorage.set(k, v),
+      removeItem: (k) => mockStorage.delete(k),
+    },
+  };
+  global.localStorage = global.window.localStorage;
+
+  const { saveDraftAsync, loadDraftAsync, removeDraftAsync } = await import("../lib/draft-store.js");
+  const testKey = "test_user_draft";
+
+  await saveDraftAsync(testKey, { values: { Name: "Initial Name" }, updatedAt: 1000 });
+  const draft1 = await loadDraftAsync(testKey);
+  if (draft1?.values?.Name !== "Initial Name" || !draft1?.updatedAt) {
+    throw new Error("Draft 1 was not saved or loaded properly!");
+  }
+
+  await saveDraftAsync(testKey, { values: { Name: "Updated Name" }, updatedAt: 2000 });
+  const draft2 = await loadDraftAsync(testKey);
+  if (draft2?.values?.Name !== "Updated Name" || draft2?.updatedAt !== 2000) {
+    throw new Error("Draft 2 (newer revision) was not loaded properly!");
+  }
+
+  await removeDraftAsync(testKey);
+  const draft3 = await loadDraftAsync(testKey);
+  if (draft3 !== null) {
+    throw new Error("Draft was not properly removed!");
+  }
+
+  delete global.window;
+  delete global.localStorage;
+  console.log("  ✓ Draft Store offline persistence, timestamp tracking & removal verified.");
+
   console.log("\n>>> ALL PHASE 3 CACHING & METADATA TESTS PASSED! <<<");
 }
 

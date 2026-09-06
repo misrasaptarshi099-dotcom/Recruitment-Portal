@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as z from "zod";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -126,17 +126,19 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
       try {
         const savedDraft = await loadDraftAsync(draftKey);
         if (isActive && savedDraft?.values) {
-          form.reset({
-            ...form.getValues(),
-            ...savedDraft.values,
-            Email: email,
-            Name: savedDraft.values?.Name || user.name || "",
-          });
-        } else if (isActive) {
+          if (!form.formState.isDirty) {
+            form.reset({
+              ...form.getValues(),
+              ...savedDraft.values,
+              Email: email,
+              Name: savedDraft.values?.Name || user.name || "",
+            });
+          }
+        } else if (isActive && !form.formState.isDirty) {
           form.setValue("Email", email);
         }
       } catch {
-        if (isActive) form.setValue("Email", email);
+        if (isActive && !form.formState.isDirty) form.setValue("Email", email);
       }
 
       let remoteSubmitted = contextSubmitted || [];
@@ -170,21 +172,47 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
 
   // Debounced auto-save draft asynchronously via IndexedDB (prevents main thread stutter)
   const watchedValues = useWatch({ control: form.control });
+  const saveTimeoutRef = useRef(null);
+  const activeSavePromiseRef = useRef(Promise.resolve());
+  const isSubmittedRef = useRef(false);
+
   useEffect(() => {
-    if (!isDraftReady || !draftKey) return;
-    const timeout = setTimeout(() => {
-      saveDraftAsync(draftKey, {
-        values: watchedValues,
-        submittedDepartments,
-      });
+    if (!isDraftReady || !draftKey || isSubmittedRef.current || isSubmitting) return;
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
+      if (isSubmittedRef.current) return;
+      const savePromise = (async () => {
+        try {
+          await saveDraftAsync(draftKey, {
+            values: watchedValues,
+            submittedDepartments,
+          });
+        } catch (err) {
+          console.error("Failed to auto-save draft:", err);
+        }
+      })();
+      activeSavePromiseRef.current = savePromise;
     }, 500);
 
-    return () => clearTimeout(timeout);
-  }, [draftKey, isDraftReady, submittedDepartments, watchedValues]);
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [draftKey, isDraftReady, isSubmitting, submittedDepartments, watchedValues]);
 
   const handleSubmit = async (values) => {
     setIsSubmitting(true);
     setErrorMessage("");
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
 
     const pendingDepartments = departmentNames.filter(
       (department) => !submittedDepartments.includes(department)
@@ -263,6 +291,7 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
       successful.forEach((dept) => toast.success(`Application submitted for ${dept}!`));
 
       if (failed.length) {
+        isSubmittedRef.current = false;
         const failedDepts = failed.map((f) => f.department).join(", ");
         const firstError = failed[0]?.message || `Could not submit ${failedDepts}.`;
         setErrorMessage(
@@ -271,10 +300,15 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
             : firstError
         );
       } else {
+        isSubmittedRef.current = true;
+        try {
+          await activeSavePromiseRef.current;
+        } catch {}
         await removeDraftAsync(draftKey);
         router.push("/departments");
       }
     } catch {
+      isSubmittedRef.current = false;
       setErrorMessage(
         "Your applications could not be submitted right now. Your saved answers are preserved for retrying."
       );

@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { QuestionnaireData } from "../../../constants/departments-data";
 
-export const dynamic = "force-static";
-export const revalidate = 86400; // 24 hours
+export const dynamic = "force-dynamic";
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
