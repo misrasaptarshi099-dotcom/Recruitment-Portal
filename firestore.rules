@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(email) {
+      return isAuthenticated() && request.auth.token.email.lower() == email.lower();
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'admin' || 
+        request.auth.token.email.lower() in [
+          'misrasaptarshi999@gmail.com',
+          'admin@vitstudent.ac.in'
+        ]
+      );
+    }
+
+    // Legacy formData collection
+    match /formData/{document} {
+      allow read: if isAuthenticated() && (
+        request.auth.token.email.lower() == resource.data.Email.lower() || isAdmin()
+      );
+      allow write: if isAdmin();
+    }
+
+    // BCNF Normalized Candidates relation
+    match /candidates/{candidateId} {
+      allow read: if isAuthenticated() && (
+        request.auth.token.email.lower() == resource.data.email.lower() || isAdmin()
+      );
+      allow write: if isAdmin();
+      
+      match /applications/{deptId} {
+        allow read: if isAuthenticated() && (
+          request.auth.token.email.lower() == resource.data.candidateEmail.lower() || isAdmin()
+        );
+        allow write: if isAdmin();
+      }
+    }
+
+    // BCNF Normalized Applications relation
+    match /applications/{appId} {
+      allow read: if isAuthenticated() && (
+        request.auth.token.email.lower() == resource.data.candidateEmail.lower() || isAdmin()
+      );
+      allow write: if isAdmin();
+    }
+
+    // BCNF Normalized Responses relation
+    match /responses/{respId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Better-auth session & user tables (handled server-side via Admin SDK, client access restricted)
+    match /user/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    match /session/{sessionId} {
+      allow read, write: if false;
+    }
+
+    // Default deny for all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
