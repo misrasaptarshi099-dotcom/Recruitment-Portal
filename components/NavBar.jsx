@@ -19,34 +19,40 @@ export default function NavBar() {
 
   const navLinks = [
     { label: "Departments", href: "/departments" },
+    ...(isAuthenticated ? [{ label: "My Profile", href: "/profile" }] : []),
     ...(isAdmin ? [{ label: "Admin Panel", href: "/admin" }] : []),
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-lg transition-colors">
-      <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 w-full border-b-2 border-border/80 bg-background/90 backdrop-blur-lg transition-colors">
+      <div className="w-full max-w-[1536px] mx-auto flex h-16 items-center justify-between px-4 sm:px-8 lg:px-12 xl:px-16">
         {/* Brand */}
         <Link href="/" className="flex items-center gap-3 transition-opacity hover:opacity-90">
-          <div className="relative h-9 w-9 overflow-hidden rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-500 to-amber-400 p-[1.5px]">
-            <div className="flex h-full w-full items-center justify-center rounded-[10px] bg-background">
+          <div className="relative h-9 w-9 overflow-hidden border-2 border-border bg-card p-1 shadow-pixel-sm">
+            <div className="flex h-full w-full items-center justify-center bg-background">
               <Image
                 src="/assets/gdg.svg"
                 alt="GDG Logo"
-                width={24}
-                height={24}
-                className="h-6 w-6"
+                width={22}
+                height={22}
+                className="h-5 w-5"
               />
             </div>
           </div>
           <div className="flex flex-col">
             <span className="text-base font-bold tracking-tight text-foreground flex items-center gap-1.5">
-              GDG on Campus
-              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-500 border border-blue-500/20">
-                <Sparkles className="h-2.5 w-2.5" /> 2026
+              <span>
+                <span className="text-[#4285F4]">G</span>
+                <span className="text-[#EA4335]">D</span>
+                <span className="text-[#0F9D58]">G</span>
+              </span>{" "}
+              <span>on Campus</span>
+              <span className="hidden sm:inline-flex items-center gap-1 bg-[#4285F4]/10 px-2 py-0.5 text-[10px] font-mono font-bold text-[#4285F4] border border-[#4285F4]/30 shadow-pixel-sm">
+                2026
               </span>
             </span>
-            <span className="text-[11px] text-muted-foreground leading-none">
-              Recruitment Portal
+            <span className="text-[10px] font-mono text-muted-foreground leading-none">
+              RECRUITMENT PORTAL
             </span>
           </div>
         </Link>
