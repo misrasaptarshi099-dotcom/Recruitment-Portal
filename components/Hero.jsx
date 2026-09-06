@@ -2,9 +2,8 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, User, Trophy, Play, Sparkles, Terminal, Gamepad2 } from "lucide-react";
+import { ArrowRight, User, Trophy, Sparkles } from "lucide-react";
 import DinoGame from "./DinoGame";
-import AsciiDinoAtmosphere from "./AsciiDinoAtmosphere";
 import { PixelBadge, PixelButton, PixelCard, ArcadeHUD } from "./design-system";
 
 export default function Hero() {
@@ -13,12 +12,9 @@ export default function Hero() {
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   return (
-    <section className="relative overflow-hidden py-10 sm:py-16 lg:py-20">
-      {/* Authentic ASCII Dino + Desert Background Atmosphere (Zero overlap with text) */}
-      <AsciiDinoAtmosphere />
-
+    <section className="relative overflow-hidden py-8 sm:py-12 lg:py-16">
       {/* Background Pixel Grid Matrix */}
-      <div className="pixel-grid-pattern pointer-events-none absolute inset-0 -z-10 opacity-30" />
+      <div className="pixel-grid-pattern pointer-events-none absolute inset-0 -z-10 opacity-25" />
 
       {/* Ambient Radial Mesh Drops */}
       <div
@@ -26,44 +22,26 @@ export default function Hero() {
         aria-hidden="true"
       />
 
-      {/* Widescreen Container: Eliminates giant side black gaps */}
-      <div className="relative z-10 w-full max-w-[1536px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
+      {/* Widescreen Container: Breathable and Uncongested */}
+      <div className="w-full max-w-[1536px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12 items-center">
           
           {/* =================================================================
-              Left Column (45% on xl): Value Proposition & Direct Navigation CTAs
+              Left Column (5 cols on lg/xl): Clean Headline, Value Prop & CTAs
               ================================================================= */}
           <div className="lg:col-span-6 xl:col-span-5 space-y-6">
-            {/* ASCII Dino Companion Badge */}
-            <div className="inline-flex items-center gap-3 p-2 px-3 border-2 border-border bg-card/90 shadow-pixel-sm font-mono text-xs">
-              <pre className="text-[#0F9D58] font-black leading-none text-[11px] select-none">
-{`   __
- / _)
-/ /
-|_|`}
-              </pre>
-              <div className="flex flex-col">
-                <span className="font-pixel text-[9px] text-[#4285F4] tracking-wider">
-                  CHROME DINO PROTOCOL v2.6
-                </span>
-                <span className="text-[10px] text-muted-foreground font-mono">
-                  OFFLINE // JUMP TO UNLOCK RECRUITMENT
-                </span>
-              </div>
-            </div>
-
-            {/* Retro Eyebrow Badge */}
-            <div className="flex flex-wrap items-center gap-2.5">
+            {/* Single Clean Eyebrow Badge */}
+            <div className="flex items-center gap-3">
               <PixelBadge variant="arcade" pulse pulseColor="bg-emerald-400">
-                RECRUITMENT 2026 // ARCADE EDITION
+                GDG RECRUITMENT 2026 // ARCADE EDITION
               </PixelBadge>
               <span className="font-mono text-[11px] text-muted-foreground hidden sm:inline">
-                [JUMP TO APPLY]
+                [ROUND 1 ACTIVE]
               </span>
             </div>
 
-            {/* Main Headline: GDG in iconic Google colors (each letter distinct) */}
-            <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl xl:text-7xl leading-[1.08]">
+            {/* Main Headline: Clean 2-3 Line Hierarchy with Google Brand Colors */}
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-foreground leading-[1.15]">
               Ready to leap into{" "}
               <span className="inline-flex items-baseline font-black tracking-tight select-none">
                 <span className="text-[#4285F4]">G</span>
@@ -74,18 +52,18 @@ export default function Hero() {
               <span className="text-[#FBBC04]">?</span>
             </h1>
 
-            {/* Subtext */}
-            <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-xl">
+            {/* Value Proposition Subtext */}
+            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-xl">
               Dodge the cacti, conquer the bugs, and build next-generation products.
-              Explore our twin technical and creative department trees, test your reflexes, and track your application progress in real time.
+              Explore our twin technical and creative department trees, test your reflexes in the offline dino arcade, and track your application progress in real time.
             </p>
 
-            {/* CTAs */}
-            <div className="flex flex-wrap items-center gap-4 pt-2">
+            {/* Primary Action Buttons */}
+            <div className="flex flex-wrap items-center gap-3.5 pt-1">
               <Link href="/departments">
                 <PixelButton
                   variant="technical"
-                  size="lg"
+                  size="md"
                   trailingIcon={ArrowRight}
                 >
                   Explore Department Trees
@@ -95,7 +73,7 @@ export default function Hero() {
               <Link href="/profile">
                 <PixelButton
                   variant="outline"
-                  size="lg"
+                  size="md"
                   icon={User}
                 >
                   My Profile & Rounds
@@ -103,32 +81,32 @@ export default function Hero() {
               </Link>
             </div>
 
-            {/* Metric Highlights Strip with Dino-Themed Icons */}
-            <div className="grid grid-cols-3 gap-3 pt-6 border-t-2 border-border/80">
-              <div className="p-3.5 border-2 border-border/80 bg-card shadow-pixel-sm">
+            {/* Metric Highlights Strip */}
+            <div className="grid grid-cols-3 gap-3 pt-5 border-t-2 border-border/80">
+              <div className="p-3 border-2 border-border/80 bg-card shadow-pixel-sm">
                 <div className="flex items-center justify-between">
-                  <span className="block font-display text-2xl sm:text-3xl font-bold text-[#4285F4]">12</span>
+                  <span className="block font-display text-2xl font-bold text-[#4285F4]">12</span>
                   <span className="text-xs">🌵</span>
                 </div>
-                <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider block mt-1">
+                <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider block mt-0.5">
                   Tracks
                 </span>
               </div>
-              <div className="p-3.5 border-2 border-border/80 bg-card shadow-pixel-sm">
+              <div className="p-3 border-2 border-border/80 bg-card shadow-pixel-sm">
                 <div className="flex items-center justify-between">
-                  <span className="block font-display text-2xl sm:text-3xl font-bold text-[#0F9D58]">2</span>
+                  <span className="block font-display text-2xl font-bold text-[#0F9D58]">2</span>
                   <span className="text-xs">🦖</span>
                 </div>
-                <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider block mt-1">
+                <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider block mt-0.5">
                   Max Choices
                 </span>
               </div>
-              <div className="p-3.5 border-2 border-border/80 bg-card shadow-pixel-sm">
+              <div className="p-3 border-2 border-border/80 bg-card shadow-pixel-sm">
                 <div className="flex items-center justify-between">
-                  <span className="block font-display text-2xl sm:text-3xl font-bold text-[#FBBC04]">3</span>
+                  <span className="block font-display text-2xl font-bold text-[#FBBC04]">3</span>
                   <span className="text-xs">🏆</span>
                 </div>
-                <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider block mt-1">
+                <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider block mt-0.5">
                   Rounds
                 </span>
               </div>
@@ -136,7 +114,7 @@ export default function Hero() {
           </div>
 
           {/* =================================================================
-              Right Column (55% on xl): Playable Widescreen Chrome Dino Arcade Station
+              Right Column (7 cols on lg/xl): Playable Widescreen Chrome Dino Arcade Station
               ================================================================= */}
           <div className="lg:col-span-6 xl:col-span-7">
             <PixelCard
@@ -154,14 +132,14 @@ export default function Hero() {
                 onToggleSound={() => setSoundEnabled((prev) => !prev)}
               />
 
-              {/* Live Canvas Game Engine (Widescreen 960x240) */}
+              {/* Live Canvas Game Engine */}
               <DinoGame
                 soundEnabled={soundEnabled}
                 onScoreUpdate={setLiveScore}
                 onHighScoreUpdate={setHighScore}
               />
 
-              {/* Bottom Quick Advice & Keycaps Strip */}
+              {/* Bottom Quick Advice & Controls Strip */}
               <div className="p-3 bg-muted/70 dark:bg-zinc-950 border-t-2 border-border/80 text-[11px] text-muted-foreground flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Trophy className="h-3.5 w-3.5 text-amber-500 shrink-0" />

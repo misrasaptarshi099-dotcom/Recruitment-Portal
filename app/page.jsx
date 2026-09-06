@@ -40,23 +40,8 @@ export default function Home() {
       <main className="flex-1">
         <Hero />
 
-        {/* ASCII Dino Trail Ribbon */}
-        <div className="w-full overflow-hidden py-2.5 border-y-2 border-border/80 bg-muted/40 font-mono text-[11px] text-muted-foreground select-none whitespace-nowrap">
-          <div className="flex justify-around items-center gap-8">
-            <span className="text-foreground/70">
-              🦖 ─── ─ ─── 🌵 ────── ··· ── 🦕 ── 🌵 ─── ── ─────── ── ──── ···
-            </span>
-            <span className="hidden md:inline font-pixel text-[9px] text-[#4285F4] tracking-widest">
-              CHROME DINO RECRUITMENT PROTOCOL // 12 TRACKS ACTIVE
-            </span>
-            <span className="text-foreground/70">
-              ··· ──── ── ─────── ── ─── 🌵 ── 🦕 ── ··· ────── 🌵 ─── ─ ─── 🦖
-            </span>
-          </div>
-        </div>
-
         {/* Departments Marquee Section */}
-        <section id="departments" className="relative py-14 sm:py-20 bg-muted/20">
+        <section id="departments" className="relative py-14 sm:py-20 border-t-2 border-border/80 bg-muted/20">
           <div className="w-full max-w-[1536px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 text-center mb-10">
             <div className="inline-flex items-center gap-2 border-2 border-border bg-card px-3.5 py-1.5 text-xs font-display font-semibold tracking-wider text-muted-foreground mb-3 shadow-pixel-sm">
               <span className="text-[#4285F4] font-mono">[01]</span>
