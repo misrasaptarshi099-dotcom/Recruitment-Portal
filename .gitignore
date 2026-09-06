@@ -1,0 +1,59 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Next.js & Build Output
+/.next/
+/out/
+/build
+/dist
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# Testing & Coverage
+/coverage
+.nyc_output
+
+# Environment & Secret Files
+.env
+.env*.local
+.env.production
+.env.staging
+*.pem
+*.key
+*.cert
+service-account*.json
+firebase-adminsdk*.json
+
+# Logs & Diagnostics
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*-debug.log
+firestore-debug.log*
+.system_generated/
+
+# OS & Editor Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# AI, Agent & IDE Tooling
+.agent/
+.agents/
+.cursor/
+.claude/
+.codex/
+.data/
+
+# Rules & Reference Docs
+*rules*.md
+rules.md
+rules (1).md
+implementation_plan.md
+walkthrough.md
+
