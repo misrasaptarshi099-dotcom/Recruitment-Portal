@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx __tests__/bcnf.test.js"
+    "test": "tsx __tests__/bcnf.test.js && tsx __tests__/security.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
