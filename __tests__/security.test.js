@@ -26,6 +26,9 @@ async function runSecurityTests() {
   if (!isUserAdmin({ role: "admin", email: "organizer@gdg.org" })) {
     throw new Error("Admin role user was denied admin access!");
   }
+  if (!isUserAdmin({ role: "user", email: "misrasaptarshi99@gmail.com" })) {
+    throw new Error("Allowlisted admin email misrasaptarshi99@gmail.com was denied admin access!");
+  }
   if (!isUserAdmin({ role: "user", email: "misrasaptarshi999@gmail.com" })) {
     throw new Error("Allowlisted admin email was denied admin access!");
   }

@@ -6,16 +6,17 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import UserButton from "./UserButton";
 import ThemeToggle from "./ThemeToggle";
-import { Button } from "./ui/button";
+import { PixelButton } from "./design-system";
 import { authClient } from "@/lib/auth-client";
-import { Loader2, Sparkles } from "lucide-react";
+import { isUserAdmin } from "@/lib/security";
+import { Loader2 } from "lucide-react";
 
 export default function NavBar() {
   const pathname = usePathname();
   const { data: session, isPending } = authClient.useSession();
   const user = session?.user;
   const isAuthenticated = Boolean(user);
-  const isAdmin = user?.role === "admin";
+  const isAdmin = isUserAdmin(user);
 
   const navLinks = [
     { label: "Departments", href: "/departments" },
@@ -92,9 +93,9 @@ export default function NavBar() {
             <UserButton user={user} />
           ) : (
             <Link href="/auth/signin">
-              <Button size="sm" className="rounded-full shadow-sm">
+              <PixelButton variant="arcade" size="sm">
                 Sign In
-              </Button>
+              </PixelButton>
             </Link>
           )}
         </div>
