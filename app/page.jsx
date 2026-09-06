@@ -41,7 +41,7 @@ export default function Home() {
         <Hero />
 
         {/* Departments Marquee Section */}
-        <section id="departments" className="relative py-14 sm:py-20 border-t-2 border-border/80 bg-muted/20">
+        <section id="departments" className="relative py-20 sm:py-28 border-t-2 border-border/80 bg-muted/15">
           <div className="w-full max-w-[1536px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 text-center mb-10">
             <div className="inline-flex items-center gap-2 border-2 border-border bg-card px-3.5 py-1.5 text-xs font-display font-semibold tracking-wider text-muted-foreground mb-3 shadow-pixel-sm">
               <span className="text-[#4285F4] font-mono">[01]</span>
