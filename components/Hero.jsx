@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, User } from "lucide-react";
 import DinoGame from "./DinoGame";
 import { PixelBadge, PixelButton, ArcadeHUD } from "./design-system";
+import AsciiDinoAtmosphere from "./AsciiDinoAtmosphere";
 
 export default function Hero() {
   const [liveScore, setLiveScore] = useState(0);
@@ -22,7 +23,10 @@ export default function Hero() {
         aria-hidden="true"
       />
 
-      <div className="w-full max-w-[1536px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
+      {/* Iconic ASCII Chrome Dino Atmosphere */}
+      <AsciiDinoAtmosphere />
+
+      <div className="w-full max-w-[1536px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 relative z-10">
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-16 items-center">
           
           {/* =================================================================
