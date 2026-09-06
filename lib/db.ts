@@ -205,8 +205,8 @@ export const connect = async (): Promise<any> => {
     return cached.db;
   }
 
-  // 3. In development without cloud credentials or running emulator: use fast local store
-  if (process.env.NODE_ENV !== "production" || process.env.BUILDING) {
+  // 3. In development or CI without cloud credentials or running emulator: use fast local store
+  if (process.env.CI || process.env.NODE_ENV !== "production" || process.env.BUILDING) {
     console.log("Using High-Speed Local Dev Store (Instant response, zero timeouts)");
     cached.db = localDb;
     cached.isEmulator = false;

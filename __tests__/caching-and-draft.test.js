@@ -56,7 +56,10 @@ async function runCachingAndDraftTests() {
   };
   global.localStorage = global.window.localStorage;
 
-  const { saveDraftAsync, loadDraftAsync, removeDraftAsync } = await import("../lib/draft-store.js");
+  const draftStoreMod = await import("../lib/draft-store.js");
+  const saveDraftAsync = draftStoreMod.saveDraftAsync || draftStoreMod.default?.saveDraftAsync;
+  const loadDraftAsync = draftStoreMod.loadDraftAsync || draftStoreMod.default?.loadDraftAsync;
+  const removeDraftAsync = draftStoreMod.removeDraftAsync || draftStoreMod.default?.removeDraftAsync;
   const testKey = "test_user_draft";
 
   await saveDraftAsync(testKey, { values: { Name: "Initial Name" }, updatedAt: 1000 });
