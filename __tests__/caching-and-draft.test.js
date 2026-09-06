@@ -1,8 +1,11 @@
 async function runCachingAndDraftTests() {
   console.log("=== Running Phase 3 Caching, Metadata & Draft Test Suite ===");
 
-  const { GET: getDepartments } = await import("../app/api/departments/route.js");
-  const { GET: getQuestions } = await import("../app/api/questions/route.js");
+  const deptMod = await import("../app/api/departments/route.js");
+  const getDepartments = deptMod.GET || deptMod.default?.GET;
+
+  const qMod = await import("../app/api/questions/route.js");
+  const getQuestions = qMod.GET || qMod.default?.GET;
 
   // Test 1: Departments Edge CDN Caching & Schema
   console.log("Test 1: Validating /api/departments Edge CDN headers & response...");
