@@ -21,6 +21,7 @@ import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { useSubmissions } from "@/components/SubmissionsProvider";
 import { Send, Loader2, ArrowLeft, CheckCircle2, User, HelpCircle } from "lucide-react";
+import { saveDraftAsync, loadDraftAsync, removeDraftAsync } from "@/lib/draft-store";
 
 const normaliseQuestion = (question) => (
   typeof question === "string"
@@ -86,8 +87,10 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
       Email: z.string(),
       Phone: z
         .string()
-        .min(1, "Phone is required")
-        .regex(/^\d{10}$/, "Phone number must be exactly 10 digits"),
+        .optional()
+        .refine((val) => !val || /^\d{10}$/.test(val), {
+          message: "Phone number must be exactly 10 digits",
+        }),
       "Year of Study": z.string().optional(),
       "Why do you want to join Organization Name?": z.string().optional(),
     };
@@ -112,26 +115,30 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
     },
   });
 
-  // Restore saved draft
+  // Restore saved draft asynchronously via IndexedDB (with localStorage fallback)
   useEffect(() => {
     if (isPending || !user || !draftKey) return;
 
     const email = user.email;
     let isActive = true;
 
-    try {
-      const savedDraft = JSON.parse(localStorage.getItem(draftKey) || "{}");
-      form.reset({
-        ...form.getValues(),
-        ...savedDraft.values,
-        Email: email,
-        Name: savedDraft.values?.Name || user.name || "",
-      });
-    } catch {
-      form.setValue("Email", email);
-    }
+    async function initDraftAndCheck() {
+      try {
+        const savedDraft = await loadDraftAsync(draftKey);
+        if (isActive && savedDraft?.values) {
+          form.reset({
+            ...form.getValues(),
+            ...savedDraft.values,
+            Email: email,
+            Name: savedDraft.values?.Name || user.name || "",
+          });
+        } else if (isActive) {
+          form.setValue("Email", email);
+        }
+      } catch {
+        if (isActive) form.setValue("Email", email);
+      }
 
-    async function checkSubmissions() {
       let remoteSubmitted = contextSubmitted || [];
 
       if (!remoteSubmitted.length) {
@@ -154,24 +161,22 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
       setIsDraftReady(true);
     }
 
-    checkSubmissions();
+    initDraftAndCheck();
 
     return () => {
       isActive = false;
     };
   }, [contextSubmitted, departmentNames, draftKey, form, isPending, user]);
 
-  // Debounced auto-save draft
+  // Debounced auto-save draft asynchronously via IndexedDB (prevents main thread stutter)
   const watchedValues = useWatch({ control: form.control });
   useEffect(() => {
     if (!isDraftReady || !draftKey) return;
     const timeout = setTimeout(() => {
-      try {
-        localStorage.setItem(
-          draftKey,
-          JSON.stringify({ values: watchedValues, submittedDepartments })
-        );
-      } catch {}
+      saveDraftAsync(draftKey, {
+        values: watchedValues,
+        submittedDepartments,
+      });
     }, 500);
 
     return () => clearTimeout(timeout);
@@ -192,15 +197,17 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
       return;
     }
 
+    const cleanStr = (s) => (typeof s === "string" ? s.replace(/<[^>]+>/g, "").trim() : s);
+
     const basicDetails = {
-      Name: values.Name,
-      RegistrationNumber: values.RegistrationNumber,
-      Gender: values.Gender || "",
-      Email: values.Email,
-      Phone: values.Phone,
-      "Year of Study": values["Year of Study"] || "",
+      Name: cleanStr(values.Name),
+      RegistrationNumber: cleanStr(values.RegistrationNumber).toUpperCase(),
+      Gender: cleanStr(values.Gender || ""),
+      Email: cleanStr(values.Email),
+      Phone: cleanStr(values.Phone || ""),
+      "Year of Study": cleanStr(values["Year of Study"] || ""),
       "Why do you want to join Organization Name?":
-        values["Why do you want to join Organization Name?"] || "",
+        cleanStr(values["Why do you want to join Organization Name?"] || ""),
     };
 
     const submitDepartment = async (department) => {
@@ -219,7 +226,7 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
           Questions: questions.reduce(
             (answers, question) => ({
               ...answers,
-              [question.name]: values[question.name] || "",
+              [question.name]: cleanStr(values[question.name] || ""),
             }),
             {}
           ),
@@ -264,6 +271,7 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
             : firstError
         );
       } else {
+        await removeDraftAsync(draftKey);
         router.push("/departments");
       }
     } catch {
@@ -380,7 +388,9 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
                 name="Phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone Number (WhatsApp) *</FormLabel>
+                    <FormLabel>
+                      Phone Number (WhatsApp) <span className="text-muted-foreground text-xs font-normal">(Optional)</span>
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="10-digit number" />
                     </FormControl>
