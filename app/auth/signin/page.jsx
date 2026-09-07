@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { PixelButton, PixelBadge } from "@/components/design-system";
+import DinoRunningLoader from "@/components/DinoRunningLoader";
 
 /* ════════════════════════════════════════════════════════════════
    ASCII DINO MASCOT — Reacts to auth states
@@ -121,31 +122,20 @@ export default function SignInPage() {
 
   if (isPending) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center justify-center h-12 w-12 border-2 border-border bg-card shadow-pixel-sm">
-            <Loader2 className="h-5 w-5 animate-spin text-[#4285F4]" />
-          </div>
-          <p className="font-pixel text-[10px] text-muted-foreground tracking-wider">
-            LOADING SESSION...
-          </p>
-        </div>
-      </div>
+      <DinoRunningLoader
+        badgeText="AUTH // LOADING_SESSION"
+        statusMessage="Synchronizing authentication session..."
+      />
     );
   }
 
   if (session?.user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center justify-center h-12 w-12 border-2 border-border bg-card shadow-pixel-sm">
-            <Loader2 className="h-5 w-5 animate-spin text-[#0F9D58]" />
-          </div>
-          <p className="font-pixel text-[10px] text-muted-foreground tracking-wider">
-            REDIRECTING...
-          </p>
-        </div>
-      </div>
+      <DinoRunningLoader
+        progress={100}
+        badgeText="AUTH // REDIRECTING"
+        statusMessage="Session authenticated. Accessing recruitment portal..."
+      />
     );
   }
 

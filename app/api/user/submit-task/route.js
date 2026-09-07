@@ -3,18 +3,11 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { connect } from "@/lib/db";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
-import { sanitizeText } from "@/lib/security";
+import { sanitizeText, isValidHttpUrl } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 
-function isValidHttpUrl(string) {
-  try {
-    const newUrl = new URL(string);
-    return newUrl.protocol === "http:" || newUrl.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
+export { isValidHttpUrl };
 
 export async function POST(req) {
   try {

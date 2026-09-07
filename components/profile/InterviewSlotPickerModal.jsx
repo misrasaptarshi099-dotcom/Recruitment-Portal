@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { PixelCard, PixelButton } from "@/components/design-system";
 import { Calendar, Clock, Video, X, Check, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { PixelRunningDino } from "@/components/DinoRunningLoader";
 
 export default function InterviewSlotPickerModal({
   isOpen,
@@ -134,10 +135,12 @@ export default function InterviewSlotPickerModal({
           </div>
 
           {loading ? (
-            <div className="py-12 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-cyan-400 mx-auto" />
-              <p className="text-xs font-mono text-muted-foreground">
-                Checking available 15-minute interview slots...
+            <div className="py-10 text-center space-y-3">
+              <div className="inline-flex items-center justify-center p-3 rounded-xl border border-cyan-500/40 bg-zinc-950 shadow-[2px_2px_0px_#06B6D4]">
+                <PixelRunningDino frame={0} className="h-8 w-8 text-cyan-400 animate-pulse" />
+              </div>
+              <p className="text-xs font-mono text-cyan-400">
+                SYNCHRONIZING 15-MIN INTERVIEW SLOTS...
               </p>
             </div>
           ) : slots.length === 0 ? (
@@ -163,7 +166,12 @@ export default function InterviewSlotPickerModal({
                       <button
                         key={d}
                         type="button"
-                        onClick={() => setSelectedDate(d)}
+                        onClick={() => {
+                          if (selectedDate !== d) {
+                            setSelectedDate(d);
+                            setSelectedSlotId(null);
+                          }
+                        }}
                         className={`px-3 py-2 rounded-lg text-xs font-mono transition-all border ${
                           selectedDate === d
                             ? "border-cyan-500 bg-cyan-500/15 text-cyan-300 font-bold shadow-[2px_2px_0px_#06B6D4]"

@@ -7,11 +7,10 @@ import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-export async function PATCH(req, { params }) {
+export async function POST(req, { params }) {
   try {
-    // 1. Rate Limiting (60 updates / min)
     const clientIp = getClientIp(req);
-    const limit = rateLimit(`shortlist_${clientIp}`, {
+    const limit = rateLimit(`admin_sendmail_${clientIp}`, {
       maxRequests: 60,
       windowSeconds: 60,
     });
@@ -19,14 +18,10 @@ export async function PATCH(req, { params }) {
     if (!limit.success) {
       return NextResponse.json(
         { error: "Rate limit exceeded" },
-        {
-          status: 429,
-          headers: { "Retry-After": limit.retryAfter.toString() },
-        }
+        { status: 429, headers: { "Retry-After": limit.retryAfter.toString() } }
       );
     }
 
-    // 2. RBAC Guard (Admin Only)
     const session = await auth.api.getSession({
       headers: await headers(),
     });
@@ -45,7 +40,6 @@ export async function PATCH(req, { params }) {
       );
     }
 
-    // 3. ID Parameter Sanitization
     const { id } = params;
     if (!id || typeof id !== "string" || !/^[a-zA-Z0-9_-]+$/.test(id)) {
       return NextResponse.json(
@@ -54,8 +48,15 @@ export async function PATCH(req, { params }) {
       );
     }
 
-    const body = await req.json();
-    const shortlisted = Boolean(body.shortlisted);
+    const body = await req.json().catch(() => ({}));
+    const { round } = body;
+
+    if (!["round1", "round2", "round3"].includes(round)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid round identifier. Must be round1, round2, or round3." },
+        { status: 400 }
+      );
+    }
 
     const db = await connect();
     const docRef = db.collection("formData").doc(id);
@@ -68,48 +69,23 @@ export async function PATCH(req, { params }) {
       );
     }
 
-    const currentData = snapshot.data() || {};
-    let appData = {};
-    try {
-      const appSnap = await db.collection("applications").doc(id).get();
-      if (appSnap.exists) {
-        appData = appSnap.data() || {};
-      }
-    } catch {
-      // ignore
-    }
+    const fieldName = `${round}MailSent`;
+    const fieldTimestamp = `${round}MailSentAt`;
+    const updatePayload = {
+      [fieldName]: true,
+      [fieldTimestamp]: new Date().toISOString(),
+    };
 
-    const isRound1MailSent = Boolean(currentData.round1MailSent || appData.round1MailSent);
+    await docRef.update(updatePayload);
 
-    // Decision state lock: Once send mail is pressed, decision state cannot be changed
-    if (isRound1MailSent) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Cannot modify Round 1 decision: Decision email has already been sent to this candidate.",
-        },
-        { status: 409 }
-      );
-    }
-
-    // 4. Atomic Dual-Update to legacy formData and BCNF applications
-    await docRef.update({
-      shortlisted,
-      Shortlisted: shortlisted,
-    });
-
-    // If BCNF application exists with same id or candidateEmail, synchronize it
     try {
       const appRef = db.collection("applications").doc(id);
       const appSnap = await appRef.get();
       if (appSnap.exists) {
-        await appRef.update({
-          shortlisted,
-          status: shortlisted ? "shortlisted" : "pending",
-        });
+        await appRef.update(updatePayload);
       }
-    } catch (bcnfErr) {
-      console.warn("Could not sync BCNF application shortlist status:", bcnfErr);
+    } catch (err) {
+      console.warn("Could not sync BCNF application send-mail status:", err?.message || err);
     }
 
     const updatedSnap = await docRef.get();
@@ -119,11 +95,15 @@ export async function PATCH(req, { params }) {
       ...serializeFirestoreData(updatedSnap.data()),
     };
 
-    return NextResponse.json({ success: true, data: applicant });
+    return NextResponse.json({
+      success: true,
+      message: `Decision notification for ${round} marked as sent (Simulated). Decision is permanently locked.`,
+      data: applicant,
+    });
   } catch (error) {
-    console.error("Error updating applicant shortlist status:", error.message);
+    console.error("Error sending decision notification:", error);
     return NextResponse.json(
-      { success: false, message: error.message },
+      { success: false, message: error.message || "Failed to send decision email" },
       { status: 500 }
     );
   }

@@ -9,6 +9,7 @@ import Footer from "@/components/Footer";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Lock, ArrowRight, Loader2 } from "lucide-react";
+import DinoRunningLoader from "@/components/DinoRunningLoader";
 
 export default function JoinDepartmentPage({ params }) {
   const [isLoading, setIsLoading] = useState(false);
@@ -41,10 +42,11 @@ export default function JoinDepartmentPage({ params }) {
       <main className="flex-1 py-12 sm:py-16">
         <div className="container mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
           {isPending ? (
-            <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-              <p className="text-sm text-muted-foreground">Checking authentication status...</p>
-            </div>
+            <DinoRunningLoader
+              badgeText="MAINFRAME // VERIFYING_SESSION"
+              statusMessage="Verifying session and recruitment clearance..."
+              fullScreen={false}
+            />
           ) : isSignedIn ? (
             <FormComp
               dept1={departments[0]}

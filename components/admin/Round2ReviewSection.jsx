@@ -28,6 +28,9 @@ import {
   Eye,
   AlertCircle,
   X,
+  Lock,
+  Award,
+  Mail,
 } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 
@@ -137,6 +140,12 @@ export default function Round2ReviewSection({ data = [], onDataUpdate }) {
   // Action: Clear or undo Round 2
   const handleClearRound2 = useCallback(
     async (id, currentCleared) => {
+      const candidate = data.find((c) => (c._id || c.id) === id);
+      if (candidate?.round2MailSent) {
+        toast.error("Cannot modify Round 2 decision: Decision email has already been sent to this candidate.");
+        return;
+      }
+
       setActionLoading(id);
       try {
         const res = await fetch(`/api/admin/round2/${id}`, {
@@ -148,7 +157,7 @@ export default function Round2ReviewSection({ data = [], onDataUpdate }) {
         if (res.ok) {
           toast.success(
             !currentCleared
-              ? "Candidate cleared Round 2! Advanced to Round 3."
+              ? "Candidate cleared Round 2! You can now send notification email to finalize."
               : "Round 2 clearance reverted."
           );
           if (onDataUpdate) onDataUpdate(id, { round2Cleared: !currentCleared, status: !currentCleared ? "round2_cleared" : "shortlisted" });
@@ -162,13 +171,19 @@ export default function Round2ReviewSection({ data = [], onDataUpdate }) {
         setActionLoading(null);
       }
     },
-    [onDataUpdate]
+    [data, onDataUpdate]
   );
 
   // Action: Reject candidate
   const handleRejectCandidate = useCallback(
     async (id) => {
-      if (!confirm("Are you sure you want to reject this candidate from the recruitment process?")) return;
+      const candidate = data.find((c) => (c._id || c.id) === id);
+      if (candidate?.round2MailSent) {
+        toast.error("Cannot modify Round 2 decision: Decision email has already been sent to this candidate.");
+        return;
+      }
+
+      if (!confirm("Are you sure you want to mark this candidate as rejected for Round 2?")) return;
       setActionLoading(id);
       try {
         const res = await fetch(`/api/admin/round2/${id}`, {
@@ -178,7 +193,7 @@ export default function Round2ReviewSection({ data = [], onDataUpdate }) {
         });
         const json = await res.json();
         if (res.ok) {
-          toast.success("Candidate marked as rejected.");
+          toast.success("Candidate marked as rejected. You can now send notification email to finalize.");
           if (onDataUpdate) onDataUpdate(id, { status: "rejected", round2Cleared: false });
         } else {
           toast.error(json.message || "Failed to reject candidate");
@@ -186,6 +201,67 @@ export default function Round2ReviewSection({ data = [], onDataUpdate }) {
       } catch (err) {
         console.error("Error rejecting candidate:", err);
         toast.error("Failed to reject candidate");
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [data, onDataUpdate]
+  );
+
+  // Action: Undo rejection
+  const handleUndoReject = useCallback(
+    async (id) => {
+      const candidate = data.find((c) => (c._id || c.id) === id);
+      if (candidate?.round2MailSent) {
+        toast.error("Cannot modify Round 2 decision: Decision email has already been sent to this candidate.");
+        return;
+      }
+
+      setActionLoading(id);
+      try {
+        const resetStatus = candidate?.round2Task?.submissionUrl ? "submitted" : "shortlisted";
+        const res = await fetch(`/api/admin/round2/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: resetStatus, round2Cleared: false }),
+        });
+        const json = await res.json();
+        if (res.ok) {
+          toast.success("Rejection undone. Candidate restored to pending review.");
+          if (onDataUpdate) onDataUpdate(id, { status: resetStatus, round2Cleared: false });
+        } else {
+          toast.error(json.message || "Failed to undo rejection");
+        }
+      } catch (err) {
+        console.error("Error undoing rejection:", err);
+        toast.error("Failed to undo rejection");
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [data, onDataUpdate]
+  );
+
+  // Action: Send decision email and finalize
+  const handleSendMail = useCallback(
+    async (id) => {
+      setActionLoading(id);
+      try {
+        const res = await fetch(`/api/admin/send-mail/${id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ round: "round2" }),
+        });
+        const json = await res.json();
+        if (res.ok) {
+          toast.success("✉️ Round 2 decision email dispatched (Simulated). Decision is permanently locked!");
+          if (onDataUpdate) onDataUpdate(id, { round2MailSent: true, round2MailSentAt: new Date().toISOString() });
+        } else {
+          toast.error(json.message || "Failed to send decision email");
+        }
+      } catch (err) {
+        console.error("Error sending decision email:", err);
+        toast.error("Failed to send decision email");
       } finally {
         setActionLoading(null);
       }
@@ -329,7 +405,7 @@ export default function Round2ReviewSection({ data = [], onDataUpdate }) {
                     Evaluation
                   </div>
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className="text-right w-[330px] min-w-[320px]">
                   <div className="inline-flex items-center justify-end gap-1.5 font-semibold text-foreground w-full">
                     Actions
                   </div>
@@ -348,8 +424,9 @@ export default function Round2ReviewSection({ data = [], onDataUpdate }) {
                   const id = candidate._id || candidate.id;
                   const task = candidate.round2Task;
                   const hasSubmitted = Boolean(task?.submissionUrl);
-                  const isCleared = Boolean(candidate.round2Cleared || candidate.status === "round2_cleared" || candidate.status === "accepted");
+                  const isCleared = Boolean(candidate.round2Cleared || candidate.status === "round2_cleared");
                   const isRejected = candidate.status === "rejected";
+                  const isMailSent = Boolean(candidate.round2MailSent);
 
                   return (
                     <TableRow key={id} className="hover:bg-muted/50">
@@ -431,29 +508,87 @@ export default function Round2ReviewSection({ data = [], onDataUpdate }) {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleClearRound2(id, isCleared)}
-                            disabled={actionLoading === id}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                              isCleared
-                                ? "bg-amber-600 text-white hover:bg-amber-700"
-                                : "bg-emerald-600 text-white hover:bg-emerald-700"
-                            }`}
-                          >
-                            {isCleared ? "Undo Clearance" : "Pass to R3"}
-                          </button>
-                          {!isRejected && (
+                      <TableCell className="text-right whitespace-nowrap">
+                        {isMailSent ? (
+                          <div className="flex items-center justify-end">
+                            <span
+                              className="h-8 px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center gap-1.5 bg-muted/60 text-muted-foreground border border-border/80 select-none"
+                              title="Decision email sent. Round 2 decision is permanently locked."
+                            >
+                              <Lock className="h-3.5 w-3.5 text-amber-500" />
+                              <span>{isCleared ? "Cleared · Mail Sent" : "Rejected · Mail Sent"}</span>
+                            </span>
+                          </div>
+                        ) : isCleared ? (
+                          <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                            <button
+                              onClick={() => handleClearRound2(id, true)}
+                              disabled={actionLoading === id}
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer bg-amber-600 text-white hover:bg-amber-700"
+                            >
+                              Undo Clearance
+                            </button>
                             <button
                               onClick={() => handleRejectCandidate(id)}
                               disabled={actionLoading === id}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
                               Reject
                             </button>
-                          )}
-                        </div>
+                            <button
+                              onClick={() => handleSendMail(id)}
+                              disabled={actionLoading === id}
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-600 text-white hover:bg-blue-700 shadow-xs"
+                              title="Send decision email to candidate and permanently lock Round 2 decision"
+                            >
+                              <Mail className="h-3.5 w-3.5" />
+                              <span>Send Mail</span>
+                            </button>
+                          </div>
+                        ) : isRejected ? (
+                          <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                            <button
+                              onClick={() => handleUndoReject(id)}
+                              disabled={actionLoading === id}
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer bg-amber-600 text-white hover:bg-amber-700"
+                            >
+                              Undo Rejection
+                            </button>
+                            <button
+                              onClick={() => handleClearRound2(id, false)}
+                              disabled={actionLoading === id}
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700"
+                            >
+                              Pass to R3
+                            </button>
+                            <button
+                              onClick={() => handleSendMail(id)}
+                              disabled={actionLoading === id}
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-600 text-white hover:bg-blue-700 shadow-xs"
+                              title="Send decision email to candidate and permanently lock Round 2 decision"
+                            >
+                              <Mail className="h-3.5 w-3.5" />
+                              <span>Send Mail</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                            <button
+                              onClick={() => handleClearRound2(id, false)}
+                              disabled={actionLoading === id}
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700"
+                            >
+                              Pass to R3
+                            </button>
+                            <button
+                              onClick={() => handleRejectCandidate(id)}
+                              disabled={actionLoading === id}
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

@@ -91,11 +91,9 @@ export default function NavBar() {
               ) : isAuthenticated ? (
                 <UserButton user={user} />
               ) : (
-                <Link href="/auth/signin">
-                  <PixelButton variant="arcade" size="sm" className="h-8 px-2 text-xs">
-                    Sign In
-                  </PixelButton>
-                </Link>
+                <PixelButton as={Link} href="/auth/signin" variant="arcade" size="sm" className="h-8 px-2 text-xs">
+                  Sign In
+                </PixelButton>
               )}
             </div>
           }
@@ -169,11 +167,9 @@ export default function NavBar() {
           ) : isAuthenticated ? (
             <UserButton user={user} />
           ) : (
-            <Link href="/auth/signin">
-              <PixelButton variant="arcade" size="sm">
-                Sign In
-              </PixelButton>
-            </Link>
+            <PixelButton as={Link} href="/auth/signin" variant="arcade" size="sm">
+              Sign In
+            </PixelButton>
           )}
         </div>
       </div>

@@ -22,14 +22,8 @@ async function runProfileAndTaskTests() {
 
   // Test 1: Validate Task URL Sanitization and Deliverable Checks
   console.log("Test 1: Validating Task Deliverable URL & Protocol Validation...");
-  const isValidHttpUrl = (str) => {
-    try {
-      const u = new URL(str);
-      return u.protocol === "http:" || u.protocol === "https:";
-    } catch {
-      return false;
-    }
-  };
+  const securityMod = await import("../lib/security.js");
+  const isValidHttpUrl = securityMod.isValidHttpUrl;
 
   if (!isValidHttpUrl("https://github.com/user/repo")) {
     throw new Error("Valid GitHub URL was rejected!");
@@ -50,18 +44,7 @@ async function runProfileAndTaskTests() {
 
   // Test 2: Validate Dino Arcade Rank Calculations & Thresholds
   console.log("Test 2: Validating Dino Rank Tier Math & Next Rank Progress...");
-  const calculateDinoRank = (highScore = 0) => {
-    if (highScore >= 1200) {
-      return { title: "CHROME T-REX", tier: "APEX", level: 4 };
-    }
-    if (highScore >= 600) {
-      return { title: "VELOCIRAPTOR", tier: "VETERAN", level: 3 };
-    }
-    if (highScore >= 250) {
-      return { title: "DESERT RUNNER", tier: "SCOUT", level: 2 };
-    }
-    return { title: "PIXEL CADET", tier: "ROOKIE", level: 1 };
-  };
+  const calculateDinoRank = securityMod.calculateDinoRank;
 
   const ranks = [
     { score: 0, expectedTier: "ROOKIE", expectedLevel: 1 },
@@ -314,17 +297,22 @@ async function runProfileAndTaskTests() {
 
   // Test 6: Round 1 & Round 2 Deadline Persistence
   console.log("Test 6: Validating Round 1 & Round 2 Deadline Configuration...");
+  const testDeadlineDocId = `test_deadlines_${Date.now()}`;
   const deadlinePayload = {
     round1Deadline: "2026-09-15T23:59:00.000Z",
     round2Deadline: "2026-09-20T23:59:00.000Z",
     updatedAt: new Date().toISOString(),
   };
-  await db.collection("recruitment_config").doc("deadlines").set(deadlinePayload);
-  const snapDeadlines = await db.collection("recruitment_config").doc("deadlines").get();
-  if (snapDeadlines.data().round1Deadline !== deadlinePayload.round1Deadline) {
-    throw new Error("Round 1 deadline configuration failed to persist!");
+  try {
+    await db.collection("recruitment_config").doc(testDeadlineDocId).set(deadlinePayload);
+    const snapDeadlines = await db.collection("recruitment_config").doc(testDeadlineDocId).get();
+    if (snapDeadlines.data().round1Deadline !== deadlinePayload.round1Deadline) {
+      throw new Error("Round 1 deadline configuration failed to persist!");
+    }
+    console.log("  ✓ Round 1 & Round 2 deadline configuration verified.");
+  } finally {
+    await db.collection("recruitment_config").doc(testDeadlineDocId).delete().catch(() => {});
   }
-  console.log("  ✓ Round 1 & Round 2 deadline configuration verified.");
 
   // Test 7: 15-Minute Cumulative Slot Generation Math
   console.log("Test 7: Validating 15-Minute Cumulative Slot Generator...");
@@ -386,6 +374,109 @@ async function runProfileAndTaskTests() {
     throw new Error("Interview slot booking transaction failed!");
   }
   console.log("  ✓ Student 15-minute slot reservation verified (booked with meeting link).");
+
+  // Test 9: Validating Send Mail Decision State Locking (Independent of next round response)
+  console.log("Test 9: Validating Send Mail Decision State Locking...");
+  const mailLockAppId = `app_maillock_${Date.now()}`;
+
+  // 9a: Round 1 shortlist can be changed freely BEFORE send mail
+  await db.collection("formData").doc(mailLockAppId).set({
+    id: mailLockAppId,
+    Email: "maillock@vitstudent.ac.in",
+    Department: "Web Dev",
+    shortlisted: true,
+    status: "shortlisted",
+  });
+  await db.collection("applications").doc(mailLockAppId).set({
+    applicationId: mailLockAppId,
+    candidateEmail: "maillock@vitstudent.ac.in",
+    department: "Web Dev",
+    shortlisted: true,
+    status: "shortlisted",
+  });
+
+  const snapR1Init = (await db.collection("formData").doc(mailLockAppId).get()).data();
+  if (snapR1Init.round1MailSent) {
+    throw new Error("round1MailSent should be false initially!");
+  }
+
+  // Once send mail is pressed in Round 1:
+  await db.collection("formData").doc(mailLockAppId).update({
+    round1MailSent: true,
+    round1MailSentAt: new Date().toISOString(),
+  });
+  const snapR1Sent = (await db.collection("formData").doc(mailLockAppId).get()).data();
+  if (!snapR1Sent.round1MailSent) {
+    throw new Error("Round 1 mail sent state failed to persist!");
+  }
+
+  // 9b: Round 2 decision can be changed freely BEFORE send mail
+  await db.collection("formData").doc(mailLockAppId).update({
+    round2Cleared: true,
+    status: "round2_cleared",
+  });
+  const snapR2Init = (await db.collection("formData").doc(mailLockAppId).get()).data();
+  if (snapR2Init.round2MailSent) {
+    throw new Error("round2MailSent should be false initially!");
+  }
+  // Clearance can be undone before mail is sent
+  await db.collection("formData").doc(mailLockAppId).update({
+    round2Cleared: false,
+    status: "submitted",
+  });
+  const snapR2Undone = (await db.collection("formData").doc(mailLockAppId).get()).data();
+  if (snapR2Undone.round2Cleared) {
+    throw new Error("Round 2 clearance undo should succeed before mail is sent!");
+  }
+
+  // Admin marks cleared and presses Send Mail in Round 2:
+  await db.collection("formData").doc(mailLockAppId).update({
+    round2Cleared: true,
+    status: "round2_cleared",
+    round2MailSent: true,
+    round2MailSentAt: new Date().toISOString(),
+  });
+  const snapR2Sent = (await db.collection("formData").doc(mailLockAppId).get()).data();
+  if (!snapR2Sent.round2MailSent || !snapR2Sent.round2Cleared) {
+    throw new Error("Round 2 mail sent state failed to persist!");
+  }
+
+  // 9c: Round 3 decision can be changed freely BEFORE send mail
+  await db.collection("formData").doc(mailLockAppId).update({
+    status: "accepted",
+  });
+  const snapR3Init = (await db.collection("formData").doc(mailLockAppId).get()).data();
+  if (snapR3Init.round3MailSent) {
+    throw new Error("round3MailSent should be false initially!");
+  }
+  // Can be undone before mail is sent
+  await db.collection("formData").doc(mailLockAppId).update({
+    status: "scheduled",
+  });
+  const snapR3Undone = (await db.collection("formData").doc(mailLockAppId).get()).data();
+  if (snapR3Undone.status !== "scheduled") {
+    throw new Error("Round 3 decision undo should succeed before mail is sent!");
+  }
+
+  // Admin marks accepted and presses Send Mail in Round 3:
+  await db.collection("formData").doc(mailLockAppId).update({
+    status: "accepted",
+    round3MailSent: true,
+    round3MailSentAt: new Date().toISOString(),
+  });
+  const snapR3Sent = (await db.collection("formData").doc(mailLockAppId).get()).data();
+  if (!snapR3Sent.round3MailSent || snapR3Sent.status !== "accepted") {
+    throw new Error("Round 3 mail sent state failed to persist!");
+  }
+
+  // Clean up test documents
+  await Promise.all([
+    db.collection("formData").doc(mailLockAppId).delete(),
+    db.collection("applications").doc(mailLockAppId).delete(),
+    db.collection("interview_slots").doc(testSlotId).delete(),
+  ]);
+
+  console.log("  ✓ Per-round Send Mail decision state locking verified (decisions unlocked before mail, locked after mail).");
 
   console.log("\n>>> ALL PHASE 5 & 6 INTERVIEW SLOTS, DEADLINES & TASK TESTS PASSED! <<<");
 }

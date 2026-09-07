@@ -65,6 +65,29 @@ export async function PATCH(req, { params }) {
     const existingData = snapshot.data() || {};
     const existingR3 = existingData.round3Interview || {};
 
+    let appData = {};
+    try {
+      const appSnap = await db.collection("applications").doc(id).get();
+      if (appSnap.exists) {
+        appData = appSnap.data() || {};
+      }
+    } catch {
+      // ignore
+    }
+
+    const isRound3MailSent = Boolean(existingData.round3MailSent || appData.round3MailSent);
+
+    // Decision state lock: Once send mail is pressed, decision state cannot be changed
+    if (status && isRound3MailSent) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Cannot modify Round 3 decision: Decision email has already been sent to this candidate.",
+        },
+        { status: 409 }
+      );
+    }
+
     const updatePayload = {};
 
     // If updating interview details:
@@ -82,9 +105,16 @@ export async function PATCH(req, { params }) {
       }
     }
 
-    // If setting final decision status (accepted / rejected / scheduled):
-    if (status && ["accepted", "rejected", "scheduled", "pending"].includes(status)) {
+    // If setting final decision status (accepted / rejected / scheduled / round2_cleared):
+    if (status && ["accepted", "rejected", "scheduled", "pending", "round2_cleared"].includes(status)) {
       updatePayload.status = status;
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      return NextResponse.json(
+        { success: false, message: "No valid fields provided to update" },
+        { status: 400 }
+      );
     }
 
     await docRef.update(updatePayload);

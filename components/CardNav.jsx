@@ -90,6 +90,11 @@ export default function CardNav({
 
   useIsomorphicLayoutEffect(() => {
     const tl = createTimeline();
+    if (isExpanded && tl) {
+      const newHeight = calculateHeight();
+      gsap.set(navRef.current, { height: newHeight });
+      tl.progress(1);
+    }
     tlRef.current = tl;
 
     return () => {

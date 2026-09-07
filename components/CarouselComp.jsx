@@ -11,6 +11,7 @@ import {
 
 import { Separator } from "./ui/separator";
 import { Button } from "@/components/ui/button";
+import { Lock } from "lucide-react";
 
 export default function CarouselComp({
     dataList,
@@ -96,18 +97,29 @@ export default function CarouselComp({
                                                 </p>
                                             )}
                                         </div>
-                                        <Button
-                                            onClick={() => handleShortlist(index)}
-                                            className={`text-white rounded-md mt-4 shrink-0 ${
-                                                shortlistStatus[index]
-                                                    ? "bg-red-600 hover:bg-red-700"
-                                                    : "bg-green-600 hover:bg-green-700"
-                                            }`}
-                                        >
-                                            {shortlistStatus[index]
-                                                ? "Unshortlist Applicant"
-                                                : "Shortlist Applicant"}
-                                        </Button>
+                                        {Boolean(shortlistStatus[index]) && Boolean(data.round1MailSent) ? (
+                                            <Button
+                                                disabled
+                                                className="bg-muted/60 text-muted-foreground border border-border/80 cursor-not-allowed select-none rounded-md mt-4 shrink-0 inline-flex items-center justify-center gap-1.5"
+                                                title="Decision email sent. Round 1 decision is permanently locked."
+                                            >
+                                                <Lock className="h-4 w-4 text-amber-500" />
+                                                <span>Shortlisted (Mail Sent 🔒)</span>
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                onClick={() => handleShortlist(index)}
+                                                className={`text-white rounded-md mt-4 shrink-0 ${
+                                                    shortlistStatus[index]
+                                                        ? "bg-red-600 hover:bg-red-700"
+                                                        : "bg-green-600 hover:bg-green-700"
+                                                }`}
+                                            >
+                                                {shortlistStatus[index]
+                                                    ? "Unshortlist Applicant"
+                                                    : "Shortlist Applicant"}
+                                            </Button>
+                                        )}
                                     </CardContent>
                                 </Card>
                             </div>

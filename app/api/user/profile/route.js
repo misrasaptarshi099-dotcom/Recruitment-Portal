@@ -67,12 +67,13 @@ const DEFAULT_ROUND2_PROMPTS = {
   },
 };
 
-function safeToIsoString(val) {
-  if (!val) return new Date().toISOString();
-  if (val instanceof Date) return val.toISOString();
+export function safeToIsoString(val, fallback = null) {
+  if (!val) return fallback;
+  if (val instanceof Date) return isNaN(val.getTime()) ? fallback : val.toISOString();
   if (typeof val?.toDate === "function") {
     try {
-      return val.toDate().toISOString();
+      const d = val.toDate();
+      return d && !isNaN(d.getTime()) ? d.toISOString() : fallback;
     } catch {}
   }
   if (typeof val === "object") {
@@ -87,49 +88,12 @@ function safeToIsoString(val) {
     const d = new Date(val);
     if (!isNaN(d.getTime())) return d.toISOString();
   } catch {}
-  return new Date().toISOString();
+  return fallback;
 }
 
-function calculateDinoRank(highScore = 0) {
-  if (highScore >= 1200) {
-    return {
-      title: "CHROME T-REX",
-      tier: "APEX",
-      level: 4,
-      badgeColor: "text-emerald-400 border-emerald-500 bg-emerald-500/10 shadow-[2px_2px_0px_#10B981]",
-      icon: "🦖",
-      description: "Apex predator of the pixel desert. Elite reaction times.",
-    };
-  }
-  if (highScore >= 600) {
-    return {
-      title: "VELOCIRAPTOR",
-      tier: "VETERAN",
-      level: 3,
-      badgeColor: "text-cyan-400 border-cyan-500 bg-cyan-500/10 shadow-[2px_2px_0px_#06B6D4]",
-      icon: "⚡",
-      description: "Agile speedrunner. Navigates cacti clusters with ease.",
-    };
-  }
-  if (highScore >= 250) {
-    return {
-      title: "DESERT RUNNER",
-      tier: "SCOUT",
-      level: 2,
-      badgeColor: "text-amber-400 border-amber-500 bg-amber-500/10 shadow-[2px_2px_0px_#F59E0B]",
-      icon: "🌵",
-      description: "Solid endurance. Regular visitor to night mode.",
-    };
-  }
-  return {
-    title: "PIXEL CADET",
-    tier: "ROOKIE",
-    level: 1,
-    badgeColor: "text-blue-400 border-blue-500 bg-blue-500/10 shadow-[2px_2px_0px_#3B82F6]",
-    icon: "🥚",
-    description: "Beginner runner. Warming up on the desert runway.",
-  };
-}
+import { calculateDinoRank } from "@/lib/security";
+
+export { calculateDinoRank };
 
 export async function GET() {
   let session = null;
@@ -245,7 +209,8 @@ export async function GET() {
           departmentSlug: slug,
           shortlisted: Boolean(data.shortlisted || data.Shortlisted),
           status: data.status || (data.shortlisted || data.Shortlisted ? "shortlisted" : "pending"),
-          submittedAt: safeToIsoString(data.createdAt),
+          submittedAt: safeToIsoString(data.createdAt, new Date().toISOString()),
+          round2Cleared: Boolean(data.round2Cleared),
           round2Task: data.round2Task || null,
           round3Interview: data.round3Interview || null,
           answers,
@@ -267,7 +232,8 @@ export async function GET() {
           departmentSlug: slug,
           shortlisted: Boolean(data.shortlisted ?? existing.shortlisted),
           status: data.status || existing.status || "pending",
-          submittedAt: safeToIsoString(data.submittedAt || data.createdAt || existing.submittedAt),
+          submittedAt: safeToIsoString(data.submittedAt || data.createdAt || existing.submittedAt, new Date().toISOString()),
+          round2Cleared: Boolean(data.round2Cleared ?? existing.round2Cleared),
           round2Task: data.round2Task || existing.round2Task || null,
           round3Interview: data.round3Interview || existing.round3Interview || null,
           answers: existing.answers || [],
@@ -395,7 +361,7 @@ export async function GET() {
             deadline: effectiveR2Deadline,
             deliverableTypes: defaultTask.deliverableTypes,
             submissionUrl: app.round2Task?.submissionUrl || null,
-            submittedAt: safeToIsoString(app.round2Task?.submittedAt),
+            submittedAt: app.round2Task?.submittedAt ? safeToIsoString(app.round2Task.submittedAt) : null,
             notes: app.round2Task?.notes || null,
           },
           round3: {
@@ -411,7 +377,7 @@ export async function GET() {
             meetLink: app.round3Interview?.meetLink || app.round3Interview?.meetingLink || null,
             meetingLink: app.round3Interview?.meetingLink || app.round3Interview?.meetLink || null,
             slotId: app.round3Interview?.slotId || null,
-            bookedAt: safeToIsoString(app.round3Interview?.bookedAt),
+            bookedAt: app.round3Interview?.bookedAt ? safeToIsoString(app.round3Interview.bookedAt) : null,
           },
         },
       };

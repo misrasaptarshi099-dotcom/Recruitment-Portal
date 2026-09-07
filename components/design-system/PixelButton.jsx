@@ -73,7 +73,12 @@ export default function PixelButton({
   ...props
 }) {
   const handleClick = (e) => {
-    if (sound && !disabled && !loading) {
+    if (disabled || loading) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (sound) {
       playArcadeBeep();
     }
     if (onClick) onClick(e);

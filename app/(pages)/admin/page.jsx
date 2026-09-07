@@ -102,19 +102,22 @@ export default async function AdminPage() {
       const bData = appMap.get(id) || {};
       const serialized = serializeFirestoreData(fData);
       return {
+        ...serialized,
         id,
         _id: id,
         Name: fData.Name || bData.applicantName || "Candidate",
         RegistrationNumber: fData.RegistrationNumber || bData.registrationNumber || "",
         Email: fData.Email || bData.applicantEmail || "",
         Department: fData.Department || bData.departmentName || bData.departmentId || "",
-        ...serialized,
         shortlisted: Boolean(bData.shortlisted ?? fData.shortlisted ?? fData.Shortlisted),
         Shortlisted: Boolean(bData.shortlisted ?? fData.shortlisted ?? fData.Shortlisted),
         status: bData.status || fData.status || (fData.shortlisted ? "shortlisted" : "pending"),
         round2Task: bData.round2Task || fData.round2Task || null,
         round2Cleared: Boolean(bData.round2Cleared ?? fData.round2Cleared),
         round3Interview: bData.round3Interview || fData.round3Interview || null,
+        round1MailSent: Boolean(bData.round1MailSent ?? fData.round1MailSent),
+        round2MailSent: Boolean(bData.round2MailSent ?? fData.round2MailSent),
+        round3MailSent: Boolean(bData.round3MailSent ?? fData.round3MailSent),
       };
     });
   } catch (error) {

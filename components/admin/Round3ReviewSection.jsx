@@ -27,6 +27,8 @@ import {
   XCircle,
   Clock,
   Award,
+  Lock,
+  Mail,
 } from "lucide-react";
 import InterviewSlotManagerModal from "./InterviewSlotManagerModal";
 
@@ -84,7 +86,8 @@ export default function Round3ReviewSection({ data = [], onDataUpdate }) {
     const total = round3Candidates.length;
     const accepted = round3Candidates.filter((c) => c.status === "accepted").length;
     const scheduled = round3Candidates.filter((c) => c.round3Interview?.slotTime && c.status !== "accepted" && c.status !== "rejected").length;
-    const awaiting = total - accepted - scheduled;
+    const rejected = round3Candidates.filter((c) => c.status === "rejected").length;
+    const awaiting = Math.max(0, total - accepted - scheduled - rejected);
     return { total, accepted, scheduled, awaiting };
   }, [round3Candidates]);
 
@@ -135,6 +138,12 @@ export default function Round3ReviewSection({ data = [], onDataUpdate }) {
 
   const handleAcceptToCore = useCallback(
     async (id) => {
+      const candidate = data.find((c) => (c._id || c.id) === id);
+      if (candidate?.round3MailSent) {
+        toast.error("Cannot modify Round 3 decision: Decision email has already been sent to this candidate.");
+        return;
+      }
+
       setActionLoading(id);
       try {
         const res = await fetch(`/api/admin/round3/${id}`, {
@@ -144,7 +153,7 @@ export default function Round3ReviewSection({ data = [], onDataUpdate }) {
         });
         const json = await res.json();
         if (res.ok) {
-          toast.success("🎉 Candidate officially accepted into GDG Core!");
+          toast.success("🎉 Candidate marked as accepted into GDG Core! You can now send notification email to finalize.");
           if (onDataUpdate) onDataUpdate(id, { status: "accepted" });
         } else {
           toast.error(json.message || "Failed to accept candidate");
@@ -156,12 +165,18 @@ export default function Round3ReviewSection({ data = [], onDataUpdate }) {
         setActionLoading(null);
       }
     },
-    [onDataUpdate]
+    [data, onDataUpdate]
   );
 
   const handleRejectCandidate = useCallback(
     async (id) => {
-      if (!confirm("Are you sure you want to mark this candidate as rejected?")) return;
+      const candidate = data.find((c) => (c._id || c.id) === id);
+      if (candidate?.round3MailSent) {
+        toast.error("Cannot modify Round 3 decision: Decision email has already been sent to this candidate.");
+        return;
+      }
+
+      if (!confirm("Are you sure you want to mark this candidate as rejected for Round 3?")) return;
       setActionLoading(id);
       try {
         const res = await fetch(`/api/admin/round3/${id}`, {
@@ -171,7 +186,7 @@ export default function Round3ReviewSection({ data = [], onDataUpdate }) {
         });
         const json = await res.json();
         if (res.ok) {
-          toast.success("Candidate marked as rejected.");
+          toast.success("Candidate marked as rejected. You can now send notification email to finalize.");
           if (onDataUpdate) onDataUpdate(id, { status: "rejected" });
         } else {
           toast.error(json.message || "Failed to reject candidate");
@@ -179,6 +194,65 @@ export default function Round3ReviewSection({ data = [], onDataUpdate }) {
       } catch (err) {
         console.error("Error rejecting candidate:", err);
         toast.error("Failed to reject candidate");
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [data, onDataUpdate]
+  );
+
+  const handleUndoDecision = useCallback(
+    async (id) => {
+      const candidate = data.find((c) => (c._id || c.id) === id);
+      if (candidate?.round3MailSent) {
+        toast.error("Cannot modify Round 3 decision: Decision email has already been sent to this candidate.");
+        return;
+      }
+
+      setActionLoading(id);
+      try {
+        const resetStatus = candidate?.round3Interview?.slotTime ? "scheduled" : "round2_cleared";
+        const res = await fetch(`/api/admin/round3/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: resetStatus }),
+        });
+        const json = await res.json();
+        if (res.ok) {
+          toast.success("Decision undone. Candidate returned to active interview stage.");
+          if (onDataUpdate) onDataUpdate(id, { status: resetStatus });
+        } else {
+          toast.error(json.message || "Failed to undo decision");
+        }
+      } catch (err) {
+        console.error("Error undoing decision:", err);
+        toast.error("Failed to undo decision");
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [data, onDataUpdate]
+  );
+
+  const handleSendMail = useCallback(
+    async (id) => {
+      setActionLoading(id);
+      try {
+        const res = await fetch(`/api/admin/send-mail/${id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ round: "round3" }),
+        });
+        const json = await res.json();
+        if (res.ok) {
+          toast.success("✉️ Round 3 final decision email dispatched (Simulated). Decision is permanently locked!");
+          if (onDataUpdate) onDataUpdate(id, { round3MailSent: true, round3MailSentAt: new Date().toISOString() });
+        } else {
+          toast.error(json.message || "Failed to send decision email");
+        }
+      } catch (err) {
+        console.error("Error sending decision email:", err);
+        toast.error("Failed to send decision email");
       } finally {
         setActionLoading(null);
       }
@@ -327,7 +401,7 @@ export default function Round3ReviewSection({ data = [], onDataUpdate }) {
                     Status
                   </div>
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className="text-right w-[330px] min-w-[320px]">
                   <div className="inline-flex items-center justify-end gap-1.5 font-semibold text-foreground w-full">
                     Decision Controls
                   </div>
@@ -348,6 +422,7 @@ export default function Round3ReviewSection({ data = [], onDataUpdate }) {
                   const isAccepted = candidate.status === "accepted";
                   const isRejected = candidate.status === "rejected";
                   const isScheduled = Boolean(r3.slotTime);
+                  const isMailSent = Boolean(candidate.round3MailSent);
 
                   return (
                     <TableRow key={id} className="hover:bg-muted/50">
@@ -422,30 +497,89 @@ export default function Round3ReviewSection({ data = [], onDataUpdate }) {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-
-                          {!isAccepted && (
+                      <TableCell className="text-right whitespace-nowrap">
+                        {isMailSent ? (
+                          <div className="flex items-center justify-end">
+                            <span
+                              className="h-8 px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center gap-1.5 bg-muted/60 text-muted-foreground border border-border/80 select-none"
+                              title="Decision email sent. Round 3 decision is permanently locked."
+                            >
+                              <Lock className="h-3.5 w-3.5 text-amber-500" />
+                              <span>{isAccepted ? "Core Member · Mail Sent" : "Rejected · Mail Sent"}</span>
+                            </span>
+                          </div>
+                        ) : isAccepted ? (
+                          <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                            <button
+                              onClick={() => handleUndoDecision(id)}
+                              disabled={actionLoading === id}
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer bg-amber-600 text-white hover:bg-amber-700"
+                            >
+                              Undo Decision
+                            </button>
+                            <button
+                              onClick={() => handleRejectCandidate(id)}
+                              disabled={actionLoading === id}
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Reject
+                            </button>
+                            <button
+                              onClick={() => handleSendMail(id)}
+                              disabled={actionLoading === id}
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-600 text-white hover:bg-blue-700 shadow-xs"
+                              title="Send final decision email to candidate and permanently lock Round 3 decision"
+                            >
+                              <Mail className="h-3.5 w-3.5" />
+                              <span>Send Mail</span>
+                            </button>
+                          </div>
+                        ) : isRejected ? (
+                          <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                            <button
+                              onClick={() => handleUndoDecision(id)}
+                              disabled={actionLoading === id}
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer bg-amber-600 text-white hover:bg-amber-700"
+                            >
+                              Undo Decision
+                            </button>
                             <button
                               onClick={() => handleAcceptToCore(id)}
                               disabled={actionLoading === id}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center gap-1.5"
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700"
                             >
                               <Award className="h-3.5 w-3.5" />
                               <span>Accept</span>
                             </button>
-                          )}
-
-                          {!isRejected && (
+                            <button
+                              onClick={() => handleSendMail(id)}
+                              disabled={actionLoading === id}
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-600 text-white hover:bg-blue-700 shadow-xs"
+                              title="Send final decision email to candidate and permanently lock Round 3 decision"
+                            >
+                              <Mail className="h-3.5 w-3.5" />
+                              <span>Send Mail</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                            <button
+                              onClick={() => handleAcceptToCore(id)}
+                              disabled={actionLoading === id}
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700"
+                            >
+                              <Award className="h-3.5 w-3.5" />
+                              <span>Accept</span>
+                            </button>
                             <button
                               onClick={() => handleRejectCandidate(id)}
                               disabled={actionLoading === id}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
                               Reject
                             </button>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

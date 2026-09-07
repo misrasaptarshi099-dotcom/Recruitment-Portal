@@ -24,20 +24,62 @@ import {
 } from "lucide-react";
 
 let cachedProfileInMemory = null;
+let cachedProfileUser = null;
 
-function getCachedProfile() {
-  if (cachedProfileInMemory) return cachedProfileInMemory;
+function getProfileCacheKey(email) {
+  if (!email) return null;
+  return `gdg_profile_cache_${email.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_")}`;
+}
+
+function getCachedProfile(email) {
+  if (!email) return null;
+  const normalized = email.trim().toLowerCase();
+  if (cachedProfileInMemory && cachedProfileUser === normalized) {
+    return cachedProfileInMemory;
+  }
   if (typeof window !== "undefined") {
     try {
-      const raw = sessionStorage.getItem("gdg_profile_cache");
+      const key = getProfileCacheKey(normalized);
+      const raw = key ? sessionStorage.getItem(key) : null;
       if (raw) {
         const parsed = JSON.parse(raw);
-        cachedProfileInMemory = parsed;
-        return parsed;
+        if (parsed && (!parsed.user || parsed.user === normalized)) {
+          const data = parsed.data || parsed;
+          cachedProfileInMemory = data;
+          cachedProfileUser = normalized;
+          return data;
+        }
       }
     } catch {}
   }
   return null;
+}
+
+function setCachedProfile(email, data) {
+  if (!email || !data) return;
+  const normalized = email.trim().toLowerCase();
+  cachedProfileInMemory = data;
+  cachedProfileUser = normalized;
+  if (typeof window !== "undefined") {
+    try {
+      const key = getProfileCacheKey(normalized);
+      if (key) {
+        sessionStorage.setItem(key, JSON.stringify({ user: normalized, data }));
+      }
+    } catch {}
+  }
+}
+
+function clearCachedProfile(email) {
+  cachedProfileInMemory = null;
+  cachedProfileUser = null;
+  if (typeof window !== "undefined") {
+    try {
+      const key = getProfileCacheKey(email);
+      if (key) sessionStorage.removeItem(key);
+      sessionStorage.removeItem("gdg_profile_cache");
+    } catch {}
+  }
 }
 
 export default function ProfilePage() {
@@ -51,17 +93,23 @@ export default function ProfilePage() {
   const [readyToDisplay, setReadyToDisplay] = useState(false);
   const hasLoadedRef = React.useRef(false);
 
-  // Hydration sync: safely hydrate client cache after mount
+  // Hydration sync: safely mount client
   useEffect(() => {
     setMounted(true);
-    const cached = getCachedProfile();
-    if (cached) {
-      setProfileData(cached);
-      hasLoadedRef.current = true;
-    }
   }, []);
 
   const userEmail = session?.user?.email;
+
+  // Hydrate cached profile only when session user identity is resolved and matches
+  useEffect(() => {
+    if (!sessionLoading && userEmail) {
+      const cached = getCachedProfile(userEmail);
+      if (cached && !hasLoadedRef.current) {
+        setProfileData(cached);
+        hasLoadedRef.current = true;
+      }
+    }
+  }, [sessionLoading, userEmail]);
 
   const fetchProfile = useCallback(async (isSilent = false) => {
     try {
@@ -73,10 +121,9 @@ export default function ProfilePage() {
       if (!res.ok) {
         if (res.status === 401) {
           setProfileData(null);
-          cachedProfileInMemory = null;
-          if (typeof window !== "undefined") {
-            try { sessionStorage.removeItem("gdg_profile_cache"); } catch {}
-          }
+          clearCachedProfile(userEmail);
+          setError("Authentication required. Please sign in with your VIT student account.");
+          setReadyToDisplay(true);
           return;
         }
         const errJson = await res.json().catch(() => ({}));
@@ -85,10 +132,7 @@ export default function ProfilePage() {
       const data = await res.json();
       setProfileData(data);
       hasLoadedRef.current = true;
-      cachedProfileInMemory = data;
-      if (typeof window !== "undefined") {
-        try { sessionStorage.setItem("gdg_profile_cache", JSON.stringify(data)); } catch {}
-      }
+      setCachedProfile(userEmail, data);
     } catch (err) {
       console.error("Profile fetch error:", err);
       if (!hasLoadedRef.current) {
@@ -97,7 +141,7 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userEmail]);
 
   useEffect(() => {
     if (!sessionLoading) {
@@ -125,8 +169,8 @@ export default function ProfilePage() {
 
     interval = setInterval(() => {
       setProgress((prev) => {
-        // If profileData is loaded, accelerate towards 100%
-        if (profileData) {
+        // If error occurs or profileData is loaded, accelerate towards 100%
+        if (profileData || (error && !profileData)) {
           const next = prev + 10;
           if (next >= 100) {
             clearInterval(interval);
@@ -151,7 +195,7 @@ export default function ProfilePage() {
       if (interval) clearInterval(interval);
       if (finishTimeout) clearTimeout(finishTimeout);
     };
-  }, [mounted, sessionLoading, userEmail, profileData, readyToDisplay]);
+  }, [mounted, sessionLoading, userEmail, profileData, readyToDisplay, error]);
 
   const handleTaskSubmitted = (applicationId, newRound2Task) => {
     setProfileData((prev) => {
@@ -177,10 +221,7 @@ export default function ProfilePage() {
           return app;
         }),
       };
-      cachedProfileInMemory = updated;
-      if (typeof window !== "undefined") {
-        try { sessionStorage.setItem("gdg_profile_cache", JSON.stringify(updated)); } catch {}
-      }
+      setCachedProfile(userEmail, updated);
       return updated;
     });
   };
@@ -216,10 +257,7 @@ export default function ProfilePage() {
           return app;
         }),
       };
-      cachedProfileInMemory = updated;
-      if (typeof window !== "undefined") {
-        try { sessionStorage.setItem("gdg_profile_cache", JSON.stringify(updated)); } catch {}
-      }
+      setCachedProfile(userEmail, updated);
       return updated;
     });
   };

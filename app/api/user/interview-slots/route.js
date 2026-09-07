@@ -37,9 +37,10 @@ export async function GET(req) {
       .where("departmentSlug", "==", deptSlug)
       .get();
 
+    const userEmailLower = (session.user.email || "").trim().toLowerCase();
     const slots = (snap?.docs || []).map((doc) => {
       const d = doc.data();
-      const isBookedByMe = d.bookedBy === session.user.email;
+      const isBookedByMe = (d.bookedBy || "").trim().toLowerCase() === userEmailLower;
       return {
         id: doc.id,
         slotId: d.slotId || doc.id,
@@ -113,10 +114,21 @@ export async function POST(req) {
     // Run atomic transaction to guarantee no double-booking race condition
     const result = await db.runTransaction(async (t) => {
       const slotRef = db.collection("interview_slots").doc(slotId);
-      const slotSnap = await t.get(slotRef);
+      const formRef = db.collection("formData").doc(applicationId);
+      const appRef = db.collection("applications").doc(applicationId);
+
+      const [slotSnap, formSnap, appSnap] = await Promise.all([
+        t.get(slotRef),
+        t.get(formRef),
+        t.get(appRef),
+      ]);
 
       if (!slotSnap.exists) {
         throw new Error("Selected interview slot does not exist");
+      }
+
+      if (!formSnap.exists) {
+        throw new Error("Application not found");
       }
 
       const slotData = slotSnap.data();
@@ -124,14 +136,6 @@ export async function POST(req) {
       // Check if slot is already booked by another user
       if (slotData.status === "booked" && slotData.bookedBy && slotData.bookedBy.toLowerCase() !== email) {
         throw new Error("This 15-minute slot has already been reserved by another candidate. Please select another slot.");
-      }
-
-      // Check application document in formData
-      const formRef = db.collection("formData").doc(applicationId);
-      const formSnap = await t.get(formRef);
-
-      if (!formSnap.exists) {
-        throw new Error("Application not found");
       }
 
       const formData = formSnap.data();
@@ -196,13 +200,12 @@ export async function POST(req) {
       });
 
       // Also update applications collection if exists
-      try {
-        const appRef = db.collection("applications").doc(applicationId);
+      if (appSnap.exists) {
         t.update(appRef, {
           round3Interview: interviewDetails,
           status: formData.status === "accepted" ? "accepted" : "round3_scheduled",
         });
-      } catch {}
+      }
 
       return interviewDetails;
     });

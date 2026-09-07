@@ -62,18 +62,52 @@ export async function PATCH(req, { params }) {
       );
     }
 
+    const currentData = snapshot.data() || {};
+    let appData = {};
+    try {
+      const appSnap = await db.collection("applications").doc(id).get();
+      if (appSnap.exists) {
+        appData = appSnap.data() || {};
+      }
+    } catch {
+      // ignore
+    }
+
+    const isRound2MailSent = Boolean(currentData.round2MailSent || appData.round2MailSent);
+
+    // Decision state lock: Once send mail is pressed, decision state cannot be changed
+    if (isRound2MailSent) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Cannot modify Round 2 decision: Decision email has already been sent to this candidate.",
+        },
+        { status: 409 }
+      );
+    }
+
     const updatePayload = {};
     if (typeof round2Cleared === "boolean") {
       updatePayload.round2Cleared = round2Cleared;
       if (round2Cleared) {
         updatePayload.status = "round2_cleared";
+      } else if (!status) {
+        const currentData = snapshot.data() || {};
+        updatePayload.status = currentData.round2Task?.submissionUrl ? "submitted" : "shortlisted";
       }
     }
-    if (status && ["pending", "shortlisted", "round2_cleared", "accepted", "rejected"].includes(status)) {
+    if (status && ["pending", "shortlisted", "submitted", "round2_cleared", "accepted", "rejected"].includes(status)) {
       updatePayload.status = status;
     }
     if (evaluationNotes !== undefined) {
       updatePayload["round2Task.evaluationNotes"] = String(evaluationNotes).slice(0, 1000);
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      return NextResponse.json(
+        { success: false, message: "No valid fields provided to update" },
+        { status: 400 }
+      );
     }
 
     // Atomic dual-write to formData and applications

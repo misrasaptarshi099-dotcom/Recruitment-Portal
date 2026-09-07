@@ -51,10 +51,19 @@ export function PixelRunningDino({ frame = 0, className = "h-10 w-10 text-emeral
   );
 }
 
-export default function DinoRunningLoader({ progress = 0, statusMessage = "Synchronizing telemetry..." }) {
+export default function DinoRunningLoader({
+  progress,
+  statusMessage = "Synchronizing telemetry...",
+  badgeText = "MAINFRAME // TELEMETRY_SYNC",
+  className = "",
+  fullScreen = true,
+}) {
   const [frame, setFrame] = useState(0);
+  const [internalProgress, setInternalProgress] = useState(0);
 
-  // Fast leg animation (every 100ms)
+  const isControlled = typeof progress === "number";
+
+  // Fast leg animation (every 110ms)
   useEffect(() => {
     const timer = setInterval(() => {
       setFrame((prev) => (prev + 1) % 2);
@@ -62,26 +71,48 @@ export default function DinoRunningLoader({ progress = 0, statusMessage = "Synch
     return () => clearInterval(timer);
   }, []);
 
-  const clampedProgress = Math.min(Math.max(Math.round(progress), 0), 100);
+  // Autonomous progress simulation when not externally controlled
+  useEffect(() => {
+    if (isControlled) return;
+
+    // Smoothly climb towards 92%
+    const interval = setInterval(() => {
+      setInternalProgress((prev) => {
+        if (prev >= 92) return 92;
+        const remaining = 95 - prev;
+        const step = Math.max(1, Math.floor(remaining * 0.08));
+        return Math.min(prev + step, 92);
+      });
+    }, 90);
+
+    return () => clearInterval(interval);
+  }, [isControlled]);
+
+  const activeProgress = isControlled ? progress : internalProgress;
+  const clampedProgress = Math.min(Math.max(Math.round(activeProgress), 0), 100);
 
   // Dynamic status text based on progress milestone
   const stageStatus =
     clampedProgress < 30
       ? "INITIALIZING MAINFRAME TELEMETRY..."
       : clampedProgress < 65
-      ? "ACCESSING CANDIDATE APPLICATION DOSSIER..."
+      ? "ACCESSING SYSTEM DOSSIER & ASSETS..."
       : clampedProgress < 95
-      ? "CALCULATING DINO RANK & ARCADE STATS..."
+      ? "CALCULATING DINO STATS & DATA..."
       : "SYNCHRONIZATION COMPLETE // UNLOCKING...";
 
   return (
-    <div className="min-h-screen bg-background py-16 px-4 sm:px-6 lg:px-8 flex items-center justify-center select-none">
+    <div
+      className={`${
+        fullScreen ? "min-h-screen" : "min-h-[400px]"
+      } bg-background py-16 px-4 sm:px-6 lg:px-8 flex items-center justify-center select-none ${className}`}
+    >
       <div className="w-full max-w-md space-y-6">
         {/* Terminal Header */}
         <div className="text-center space-y-1">
           <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-pixel text-[10px] tracking-widest uppercase animate-pulse">
             <span>●</span>
-            <span>MAINFRAME // ACCESSING_CANDIDATE_DATA</span>
+            <span>{badgeText}</span>
           </div>
           <p className="font-mono text-xs text-muted-foreground pt-1">
             {stageStatus}

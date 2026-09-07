@@ -71,13 +71,13 @@ if (!cached) {
 // Timeout helper to ensure database calls never freeze the server
 const withTimeout = <T>(promise: Promise<T>, ms: number, fallback: () => Promise<T>): Promise<T> => {
   let timer: NodeJS.Timeout;
-  const timeoutPromise = new Promise<T>((resolve) => {
+  const timeoutPromise = new Promise<T>((resolve, reject) => {
     timer = setTimeout(async () => {
       console.warn(`Firestore operation timed out after ${ms}ms, failing over to Local Store`);
       try {
         resolve(await fallback());
-      } catch {
-        // fallback failed
+      } catch (err) {
+        reject(err);
       }
     }, ms);
   });

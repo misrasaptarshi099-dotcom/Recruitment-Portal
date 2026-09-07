@@ -42,7 +42,7 @@ export async function GET(req) {
     let query = db.collection("interview_slots");
 
     if (department && department !== "All") {
-      const slug = department.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+      const slug = department.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
       query = query.where("departmentSlug", "==", slug);
     }
 
@@ -142,6 +142,17 @@ export async function POST(req) {
     const batch = db.batch();
     const generatedSlots = [];
 
+    // Read existing slots for the date and department to preserve existing candidate bookings
+    const existingSnap = await db
+      .collection("interview_slots")
+      .where("departmentSlug", "==", deptSlug)
+      .where("date", "==", date.trim())
+      .get();
+    const existingMap = new Map();
+    (existingSnap?.docs || []).forEach((doc) => {
+      existingMap.set(doc.id, doc.data());
+    });
+
     // Break cumulative time range [n, m] into 15-minute meeting slots
     for (let cur = startMinutes; cur + 15 <= endMinutes; cur += 15) {
       const sH = Math.floor(cur / 60);
@@ -154,6 +165,9 @@ export async function POST(req) {
       const slotLabel = `${format12h(slotStart)} - ${format12h(slotEnd)}`;
       const slotId = `slot_${deptSlug}_${date.replace(/[^a-zA-Z0-9]/g, "")}_${pad(sH)}${pad(sM)}`;
 
+      const existing = existingMap.get(slotId);
+      const isAlreadyBooked = Boolean(existing && (existing.status === "booked" || existing.bookedBy));
+
       const slotDoc = {
         slotId,
         department: department.trim(),
@@ -163,18 +177,18 @@ export async function POST(req) {
         endTime: slotEnd,
         durationMinutes: 15,
         slotLabel,
-        meetingLink: meetingLink ? String(meetingLink).trim() : "",
-        status: "available",
-        bookedBy: null,
-        candidateName: null,
-        applicationId: null,
-        bookedAt: null,
-        createdAt: new Date().toISOString(),
+        meetingLink: meetingLink ? String(meetingLink).trim() : (existing?.meetingLink || ""),
+        status: isAlreadyBooked ? existing.status : "available",
+        bookedBy: isAlreadyBooked ? existing.bookedBy : null,
+        candidateName: isAlreadyBooked ? existing.candidateName : null,
+        applicationId: isAlreadyBooked ? existing.applicationId : null,
+        bookedAt: isAlreadyBooked ? existing.bookedAt : null,
+        createdAt: existing?.createdAt || new Date().toISOString(),
         createdBy: session.user.email,
       };
 
       const docRef = db.collection("interview_slots").doc(slotId);
-      // Use set with merge: false to create or preserve booking if exists
+      // Preserve existing booking fields when slot already exists
       batch.set(docRef, slotDoc, { merge: true });
       generatedSlots.push(slotDoc);
     }
@@ -227,6 +241,14 @@ export async function DELETE(req) {
       return NextResponse.json(
         { success: false, message: "Slot not found" },
         { status: 404 }
+      );
+    }
+
+    const slotData = snap.data() || {};
+    if (slotData.status === "booked" || slotData.bookedBy) {
+      return NextResponse.json(
+        { success: false, message: "Cannot delete an interview slot that is already booked by an applicant" },
+        { status: 409 }
       );
     }
 

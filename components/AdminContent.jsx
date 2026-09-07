@@ -8,6 +8,8 @@ import Round2ReviewSection from "./admin/Round2ReviewSection";
 import Round3ReviewSection from "./admin/Round3ReviewSection";
 import DeadlineConfigModal from "./admin/DeadlineConfigModal";
 import { ShieldAlert, Lock, ArrowRight, Loader2, Layers, FileCode2, Users, CheckCircle2, Calendar, Clock } from "lucide-react";
+import { isUserAdmin } from "@/lib/security";
+import DinoRunningLoader from "./DinoRunningLoader";
 
 function UnauthorizedView() {
   return (
@@ -234,7 +236,7 @@ export default function AdminContent({ applicants }) {
               Application Review & Shortlisting
             </h2>
           </div>
-          <DataTable data={applicantsData} />
+          <DataTable data={applicantsData} onDataUpdate={handleDataUpdate} />
         </div>
       )}
 
@@ -276,10 +278,11 @@ export default function AdminContent({ applicants }) {
 
   if (isPending) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-        <p className="text-sm text-muted-foreground">Verifying admin permissions...</p>
-      </div>
+      <DinoRunningLoader
+        badgeText="ADMIN_PORTAL // AUTHENTICATING"
+        statusMessage="Verifying admin credentials and security clearance..."
+        fullScreen={false}
+      />
     );
   }
 
@@ -287,7 +290,7 @@ export default function AdminContent({ applicants }) {
     return <UnauthorizedView />;
   }
 
-  if (user.role !== "admin") {
+  if (!isUserAdmin(user)) {
     return <AccessDeniedView />;
   }
 

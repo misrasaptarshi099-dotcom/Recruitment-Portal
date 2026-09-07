@@ -31,11 +31,17 @@ import PaginationComp from "./PaginationComp";
 import DialogComp from "./DialogComp";
 import { CSVLink } from "react-csv";
 import { CSV_Header } from "@/constants";
+import { Lock, Mail } from "lucide-react";
 
-export default function DataTable({ data = [] }) {
+export default function DataTable({ data = [], onDataUpdate }) {
   const [tableData, setTableData] = useState(data);
   const [selectedDept, setSelectedDept] = useState("All");
   const [selectedShortlisted, setSelectedShortlisted] = useState("All");
+  const [actionLoading, setActionLoading] = useState(null);
+
+  React.useEffect(() => {
+    setTableData(data);
+  }, [data]);
 
   const filterFunc = useCallback((dept) => {
     setSelectedDept(dept || "All");
@@ -56,30 +62,91 @@ export default function DataTable({ data = [] }) {
     });
   }, [tableData, selectedDept, selectedShortlisted]);
 
-  const handleShortlist = useCallback(async (id, currentStatus) => {
-    try {
-      const res = await fetch(`/api/shortlist/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shortlisted: !currentStatus }),
-      });
-
-      if (res.ok) {
-        setTableData((prev) =>
-          prev.map((applicant) =>
-            applicant._id === id || applicant.id === id
-              ? { ...applicant, shortlisted: !currentStatus }
-              : applicant
-          )
-        );
-        toast.success("Applicant status updated!");
-      } else {
-        toast.error("Failed to update status");
+  const handleSendMail = useCallback(
+    async (id) => {
+      setActionLoading(id);
+      try {
+        const res = await fetch(`/api/admin/send-mail/${id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ round: "round1" }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (res.ok) {
+          toast.success("✉️ Round 1 decision email dispatched (Simulated). Decision is permanently locked!");
+          setTableData((prev) =>
+            prev.map((app) =>
+              app._id === id || app.id === id
+                ? { ...app, round1MailSent: true, round1MailSentAt: new Date().toISOString() }
+                : app
+            )
+          );
+          if (onDataUpdate) {
+            onDataUpdate(id, { round1MailSent: true, round1MailSentAt: new Date().toISOString() });
+          }
+        } else {
+          toast.error(json.message || "Failed to send decision email");
+        }
+      } catch (err) {
+        console.error("Error sending decision email:", err);
+        toast.error("Failed to send decision email");
+      } finally {
+        setActionLoading(null);
       }
-    } catch {
-      toast.error("Error updating applicant status");
-    }
-  }, []);
+    },
+    [onDataUpdate]
+  );
+
+  const handleShortlist = useCallback(
+    async (id, currentStatus) => {
+      // Check if decision is already locked by mail sent
+      const applicant = tableData.find((a) => a._id === id || a.id === id);
+      if (applicant?.round1MailSent) {
+        toast.error("Cannot modify Round 1 decision: Decision email has already been sent to this candidate.");
+        return;
+      }
+
+      setActionLoading(id);
+      try {
+        const res = await fetch(`/api/shortlist/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shortlisted: !currentStatus }),
+        });
+
+        const json = await res.json().catch(() => ({}));
+
+        if (res.ok) {
+          setTableData((prev) =>
+            prev.map((app) =>
+              app._id === id || app.id === id
+                ? { ...app, shortlisted: !currentStatus, Shortlisted: !currentStatus }
+                : app
+            )
+          );
+          if (onDataUpdate) {
+            onDataUpdate(id, {
+              shortlisted: !currentStatus,
+              Shortlisted: !currentStatus,
+              status: !currentStatus ? "shortlisted" : "pending",
+            });
+          }
+          toast.success(
+            !currentStatus
+              ? "Applicant shortlisted! You can now send notification email to finalize."
+              : "Applicant unshortlisted."
+          );
+        } else {
+          toast.error(json.message || "Failed to update status");
+        }
+      } catch {
+        toast.error("Error updating applicant status");
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [tableData, onDataUpdate]
+  );
 
   const columns = useMemo(
     () => [
@@ -111,24 +178,58 @@ export default function DataTable({ data = [] }) {
         Header: "Shortlisted",
         accessor: "shortlisted",
         Cell: ({ row }) => {
-          const isShortlisted = Boolean(row.original.shortlisted);
+          const isShortlisted = Boolean(row.original.shortlisted || row.original.Shortlisted);
           const applicantId = row.original._id || row.original.id;
+          const isMailSent = Boolean(row.original.round1MailSent);
+
+          if (isMailSent) {
+            return (
+              <span
+                className="h-8 px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center gap-1.5 bg-muted/60 text-muted-foreground border border-border/80 cursor-not-allowed select-none"
+                title="Decision email sent. Round 1 decision is permanently locked."
+              >
+                <Lock className="h-3 w-3 text-amber-500 shrink-0" />
+                <span>Shortlisted · Mail Sent</span>
+              </span>
+            );
+          }
+
+          if (isShortlisted) {
+            return (
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <button
+                  onClick={() => handleShortlist(applicantId, true)}
+                  disabled={actionLoading === applicantId}
+                  className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Unshortlist
+                </button>
+                <button
+                  onClick={() => handleSendMail(applicantId)}
+                  disabled={actionLoading === applicantId}
+                  className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-600 text-white hover:bg-blue-700 shadow-xs"
+                  title="Send decision email to candidate and finalize decision"
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  <span>Send Mail</span>
+                </button>
+              </div>
+            );
+          }
+
           return (
             <button
-              onClick={() => handleShortlist(applicantId, isShortlisted)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                isShortlisted
-                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  : "bg-emerald-600 text-white hover:bg-emerald-700"
-              }`}
+              onClick={() => handleShortlist(applicantId, false)}
+              disabled={actionLoading === applicantId}
+              className="h-8 min-w-[84px] px-3 rounded-lg text-xs font-semibold whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700"
             >
-              {isShortlisted ? "Unshortlist" : "Shortlist"}
+              Shortlist
             </button>
           );
         },
       },
     ],
-    [handleShortlist]
+    [handleShortlist, handleSendMail, actionLoading]
   );
 
   const {

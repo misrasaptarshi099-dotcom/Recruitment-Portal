@@ -370,8 +370,14 @@ export default function DinoGame({
       }
     };
 
+    const handleBlur = () => {
+      keysRef.current.jump = false;
+      keysRef.current.duck = false;
+    };
+
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleBlur);
 
     // Initial render for Idle state
     if (gameState !== "playing") {
@@ -652,6 +658,7 @@ export default function DinoGame({
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleBlur);
     };
   }, [gameState, onScoreUpdate, persistScore, startGame]);
 
