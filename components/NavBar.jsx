@@ -17,8 +17,26 @@ export default function NavBar() {
   const pathname = usePathname();
   const { data: session, isPending } = authClient.useSession();
   const user = session?.user;
+  const [isDynamicAdmin, setIsDynamicAdmin] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!user) {
+      setIsDynamicAdmin(false);
+      return;
+    }
+    if (isUserAdmin(user)) {
+      setIsDynamicAdmin(true);
+      return;
+    }
+    fetch("/api/admin/roles")
+      .then((res) => {
+        if (res.ok) setIsDynamicAdmin(true);
+      })
+      .catch(() => {});
+  }, [user]);
+
   const isAuthenticated = Boolean(user);
-  const isAdmin = isUserAdmin(user);
+  const isAdmin = isUserAdmin(user) || isDynamicAdmin;
 
   const navLinks = [
     { label: "Departments", href: "/departments" },

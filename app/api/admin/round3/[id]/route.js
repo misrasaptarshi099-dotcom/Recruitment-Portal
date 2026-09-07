@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isUserAdmin } from "@/lib/security";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { loadRoleConfig, authorizeDepartmentAccess } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,10 @@ export async function PATCH(req, { params }) {
       );
     }
 
-    if (!isUserAdmin(session.user)) {
+    const db = await connect();
+    const roleConfig = await loadRoleConfig(db);
+
+    if (!isUserAdmin(session.user, roleConfig)) {
       return NextResponse.json(
         { success: false, message: "Forbidden: Administrator privileges required" },
         { status: 403 }
@@ -51,7 +55,6 @@ export async function PATCH(req, { params }) {
     const body = await req.json().catch(() => ({}));
     const { slotTime, venue, meetLink, status } = body;
 
-    const db = await connect();
     const docRef = db.collection("formData").doc(id);
     const snapshot = await docRef.get();
 
@@ -63,6 +66,16 @@ export async function PATCH(req, { params }) {
     }
 
     const existingData = snapshot.data() || {};
+    // Department scoping guard
+    const applicantDept = (existingData.Department) || "";
+    const deptAuth = authorizeDepartmentAccess(session.user, applicantDept, roleConfig);
+    if (!deptAuth.authorized) {
+      return NextResponse.json(
+        { success: false, message: deptAuth.reason },
+        { status: 403 }
+      );
+    }
+
     const existingR3 = existingData.round3Interview || {};
 
     let appData = {};

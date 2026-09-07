@@ -8,7 +8,13 @@ import { toast } from "sonner";
 
 const departmentsList = Array.isArray(rawDepts) ? rawDepts : [];
 
-export default function InterviewSlotManagerModal({ isOpen, onClose, defaultDepartment = "Web Dev", onSlotsUpdated }) {
+export default function InterviewSlotManagerModal({ isOpen, onClose, defaultDepartment = "Web Dev", allowedDepartments, onSlotsUpdated }) {
+  // Filter departments for dept_managers
+  const filteredDepartmentsList = React.useMemo(() => {
+    if (!allowedDepartments || allowedDepartments.length === 0) return departmentsList;
+    return departmentsList.filter((d) => allowedDepartments.includes(d.name));
+  }, [allowedDepartments]);
+
   const [selectedDept, setSelectedDept] = useState(defaultDepartment || "Web Dev");
   const [date, setDate] = useState(() => {
     const tomorrow = new Date();
@@ -156,7 +162,7 @@ export default function InterviewSlotManagerModal({ isOpen, onClose, defaultDepa
                   onChange={(e) => setSelectedDept(e.target.value)}
                   className="w-full bg-background border border-border/80 px-3 py-2 text-xs font-mono rounded-lg focus:outline-none focus:ring-1 focus:ring-cyan-500 text-foreground"
                 >
-                  {(departmentsList || []).map((d) => (
+                  {(filteredDepartmentsList || []).map((d) => (
                     <option key={d.name || d.id} value={d.name}>
                       {d.name}
                     </option>

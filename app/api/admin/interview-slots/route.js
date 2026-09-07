@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { connect } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { isUserAdmin } from "@/lib/security";
+import { isUserAdmin, canAccessDepartment } from "@/lib/security";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { loadRoleConfig } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,10 @@ export async function GET(req) {
       headers: await headers(),
     });
 
-    if (!session?.user || !isUserAdmin(session.user)) {
+    const db = await connect();
+    const roleConfig = await loadRoleConfig(db);
+
+    if (!session?.user || !isUserAdmin(session.user, roleConfig)) {
       return NextResponse.json(
         { success: false, message: "Forbidden: Admin privileges required" },
         { status: 403 }
@@ -38,7 +42,10 @@ export async function GET(req) {
     const department = searchParams.get("department");
     const date = searchParams.get("date");
 
-    const db = await connect();
+    // Department scoping for managers: if requesting "All", filter to assigned depts
+    const { getUserAdminRole } = await import("@/lib/security");
+    const userRole = getUserAdminRole(session.user, roleConfig);
+
     let query = db.collection("interview_slots");
 
     if (department && department !== "All") {
@@ -63,7 +70,13 @@ export async function GET(req) {
       return (a.startTime || "").localeCompare(b.startTime || "");
     });
 
-    return NextResponse.json({ success: true, data: slots });
+    // Filter slots for dept_managers to only their assigned departments
+    let filteredSlots = slots;
+    if (userRole.role === "dept_manager" && userRole.departments.length > 0) {
+      filteredSlots = slots.filter((s) => userRole.departments.includes(s.department));
+    }
+
+    return NextResponse.json({ success: true, data: filteredSlots });
   } catch (error) {
     console.error("Error fetching interview slots:", error);
     return NextResponse.json(
@@ -92,7 +105,10 @@ export async function POST(req) {
       headers: await headers(),
     });
 
-    if (!session?.user || !isUserAdmin(session.user)) {
+    const db = await connect();
+    const roleConfig = await loadRoleConfig(db);
+
+    if (!session?.user || !isUserAdmin(session.user, roleConfig)) {
       return NextResponse.json(
         { success: false, message: "Forbidden: Admin privileges required" },
         { status: 403 }
@@ -106,6 +122,14 @@ export async function POST(req) {
       return NextResponse.json(
         { success: false, message: "Department, date, start time, and end time are required" },
         { status: 400 }
+      );
+    }
+
+    // Department scoping guard for slot creation
+    if (!canAccessDepartment(session.user, department, roleConfig)) {
+      return NextResponse.json(
+        { success: false, message: `Access denied: You do not manage the "${department}" department` },
+        { status: 403 }
       );
     }
 
@@ -138,7 +162,6 @@ export async function POST(req) {
     }
 
     const deptSlug = department.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
-    const db = await connect();
     const batch = db.batch();
     const generatedSlots = [];
 
@@ -216,7 +239,10 @@ export async function DELETE(req) {
       headers: await headers(),
     });
 
-    if (!session?.user || !isUserAdmin(session.user)) {
+    const db = await connect();
+    const roleConfig = await loadRoleConfig(db);
+
+    if (!session?.user || !isUserAdmin(session.user, roleConfig)) {
       return NextResponse.json(
         { success: false, message: "Forbidden: Admin privileges required" },
         { status: 403 }
@@ -233,7 +259,6 @@ export async function DELETE(req) {
       );
     }
 
-    const db = await connect();
     const docRef = db.collection("interview_slots").doc(slotId);
     const snap = await docRef.get();
 
@@ -245,6 +270,15 @@ export async function DELETE(req) {
     }
 
     const slotData = snap.data() || {};
+
+    // Department scoping guard for slot deletion
+    if (slotData.department && !canAccessDepartment(session.user, slotData.department, roleConfig)) {
+      return NextResponse.json(
+        { success: false, message: `Access denied: You do not manage the "${slotData.department}" department` },
+        { status: 403 }
+      );
+    }
+
     if (slotData.status === "booked" || slotData.bookedBy) {
       return NextResponse.json(
         { success: false, message: "Cannot delete an interview slot that is already booked by an applicant" },

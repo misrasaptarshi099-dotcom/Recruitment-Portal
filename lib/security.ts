@@ -34,6 +34,7 @@ export function isAdminEmail(email: string): boolean {
   // Default fallback for development/local admin
   adminList.push("misrasaptarshi99@gmail.com");
   adminList.push("misrasaptarshi999@gmail.com");
+  adminList.push("misrasaptarshi099@gmail.com");
   adminList.push("admin@vitstudent.ac.in");
 
   return adminList.includes(lower);
