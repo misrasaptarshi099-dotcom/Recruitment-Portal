@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useEffect, useState, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, AlertTriangle } from "lucide-react";
 import { PixelButton, PixelBadge } from "@/components/design-system";
 import DinoRunningLoader from "@/components/DinoRunningLoader";
 
@@ -96,29 +96,70 @@ function GoogleGIcon({ className = "h-4 w-4" }) {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   SIGN IN PAGE — Google OAuth Only, @vitstudent.ac.in
+   SIGN IN PAGE CONTENT — With Rejection Reason Banner
    ════════════════════════════════════════════════════════════════ */
 
-export default function SignInPage() {
+function SignInContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session, isPending } = authClient.useSession();
   const [submitting, setSubmitting] = useState(false);
   const [dinoState, setDinoState] = useState("idle");
 
+  const errorParam = searchParams.get("error");
+  const reasonParam = searchParams.get("reason");
+  const errorDescParam = searchParams.get("error_description");
+  const messageParam = searchParams.get("message");
+
+  // Determine explicit human-readable rejection reason
+  const rejectionReason = useMemo(() => {
+    if (reasonParam) return decodeURIComponent(reasonParam);
+    if (errorDescParam) return decodeURIComponent(errorDescParam);
+    if (messageParam) return decodeURIComponent(messageParam);
+    if (errorParam) {
+      switch (errorParam.toLowerCase()) {
+        case "forbidden":
+          return "Access Denied: Only @vitstudent.ac.in institutional accounts are permitted. Personal Gmail accounts cannot register as candidates.";
+        case "access_denied":
+          return "Google sign-in was cancelled or permissions were denied.";
+        case "oauth_code_verification_failed":
+        case "invalid_code":
+          return "Authentication session expired or invalid authorization code. Please try signing in again.";
+        case "no_callback_url":
+        case "state_mismatch":
+          return "Authentication session mismatch. Please retry signing in.";
+        default:
+          return `Sign-in rejected (${errorParam.replace(/_/g, " ")}). Please try again with your official VIT account.`;
+      }
+    }
+    return null;
+  }, [errorParam, reasonParam, errorDescParam, messageParam]);
+
+  // If rejection reason is present, animate dino error & toast
+  useEffect(() => {
+    if (rejectionReason) {
+      setDinoState("error");
+      toast.error(rejectionReason, {
+        duration: 8000,
+        id: "auth-rejection-toast",
+      });
+    }
+  }, [rejectionReason]);
+
   // Redirect if already authenticated
   useEffect(() => {
-    if (session?.user && !isPending) {
+    if (session?.user && !isPending && !rejectionReason) {
       router.push("/");
     }
-  }, [session, isPending, router]);
+  }, [session, isPending, router, rejectionReason]);
 
-  // Reset dino after animation
+  // Reset dino after temporary animation only when no persistent rejection is active
   useEffect(() => {
-    if (dinoState === "success" || dinoState === "error") {
-      const timer = setTimeout(() => setDinoState("idle"), 800);
+    if ((dinoState === "success" || dinoState === "error") && !rejectionReason) {
+      const timer = setTimeout(() => setDinoState("idle"), 1200);
       return () => clearTimeout(timer);
     }
-  }, [dinoState]);
+  }, [dinoState, rejectionReason]);
 
   if (isPending) {
     return (
@@ -129,7 +170,7 @@ export default function SignInPage() {
     );
   }
 
-  if (session?.user) {
+  if (session?.user && !rejectionReason) {
     return (
       <DinoRunningLoader
         progress={100}
@@ -146,6 +187,7 @@ export default function SignInPage() {
       const res = await authClient.signIn.social({
         provider: "google",
         callbackURL: "/",
+        errorCallbackURL: "/auth/signin",
       });
       if (res?.error) {
         console.error("Google sign-in error:", res.error);
@@ -270,13 +312,61 @@ export default function SignInPage() {
                 </div>
               </div>
 
-              {/* Domain Notice */}
-              <div className="mx-5 sm:mx-6 mb-4 p-3 border-2 border-dashed border-[#FBBC04]/40 bg-[#FBBC04]/5">
-                <p className="text-[11px] font-mono text-[#FBBC04] leading-relaxed">
-                  <span className="font-bold">⚠ DOMAIN LOCK:</span>{" "}
-                  Only @vitstudent.ac.in accounts are accepted (Authorized admins exempt). Personal Gmail accounts will be rejected.
-                </p>
-              </div>
+              {/* ═══════ REJECTION NOTICE BANNER (Shown when sign-in rejected) ═══════ */}
+              {rejectionReason ? (
+                <div className="mx-5 sm:mx-6 mb-4 p-4 border-2 border-[#EA4335] bg-[#EA4335]/10 shadow-[0_0_15px_rgba(234,67,53,0.12)]">
+                  <div className="flex items-start gap-3">
+                    <div className="p-1.5 rounded bg-[#EA4335]/20 text-[#EA4335] shrink-0 mt-0.5">
+                      <AlertTriangle className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-pixel text-[8px] sm:text-[9px] text-[#EA4335] tracking-wider uppercase">
+                          [AUTH // REJECTION_NOTICE]
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            router.replace("/auth/signin");
+                            setDinoState("idle");
+                          }}
+                          className="text-[#EA4335]/70 hover:text-[#EA4335] text-xs font-mono font-bold"
+                          title="Dismiss notice"
+                        >
+                          ✕ DISMISS
+                        </button>
+                      </div>
+                      <h4 className="text-sm font-bold text-foreground mt-1">
+                        Sign-In Rejected
+                      </h4>
+                      <p className="text-xs text-foreground/90 mt-1 font-mono leading-relaxed bg-background/60 p-2 border border-[#EA4335]/20 rounded">
+                        {rejectionReason}
+                      </p>
+                      <div className="mt-3 pt-2 border-t border-[#EA4335]/20 flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[10px] font-mono text-muted-foreground">
+                          Institutional account required (@vitstudent.ac.in)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleGoogleSignIn}
+                          disabled={submitting}
+                          className="text-xs font-mono font-bold text-[#4285F4] hover:underline flex items-center gap-1"
+                        >
+                          Switch Google Account →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Standard Domain Notice */
+                <div className="mx-5 sm:mx-6 mb-4 p-3 border-2 border-dashed border-[#FBBC04]/40 bg-[#FBBC04]/5">
+                  <p className="text-[11px] font-mono text-[#FBBC04] leading-relaxed">
+                    <span className="font-bold">⚠ DOMAIN LOCK:</span>{" "}
+                    Only @vitstudent.ac.in accounts are accepted (Authorized admins exempt). Personal Gmail accounts will be rejected.
+                  </p>
+                </div>
+              )}
 
               {/* Google Sign-In Button */}
               <div className="px-5 sm:px-6 pb-6">
@@ -290,7 +380,7 @@ export default function SignInPage() {
                   sound
                 >
                   {!submitting && <GoogleGIcon className="h-5 w-5 shrink-0" />}
-                  <span>{submitting ? "Connecting..." : "Continue with Google"}</span>
+                  <span>{submitting ? "Connecting to Google..." : rejectionReason ? "Sign In with Different Account" : "Continue with Google"}</span>
                 </PixelButton>
 
                 {/* Mobile-only dino + tagline */}
@@ -310,7 +400,7 @@ export default function SignInPage() {
                   Institutional SSO • @vitstudent.ac.in
                 </span>
                 <span className="font-pixel text-[8px] text-muted-foreground/50 tracking-wider hidden sm:inline">
-                  v2.6
+                  v2.7
                 </span>
               </div>
             </div>
@@ -346,5 +436,20 @@ export default function SignInPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <DinoRunningLoader
+          badgeText="AUTH // INITIALIZING"
+          statusMessage="Loading recruitment portal authentication..."
+        />
+      }
+    >
+      <SignInContent />
+    </Suspense>
   );
 }
