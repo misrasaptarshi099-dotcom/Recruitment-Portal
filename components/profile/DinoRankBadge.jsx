@@ -2,7 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
-import { Trophy, Gamepad2, Zap } from "lucide-react";
+import { Gamepad2, Zap } from "lucide-react";
 import Link from "next/link";
 import { PixelButton } from "../design-system";
 
@@ -13,13 +13,12 @@ export default function DinoRankBadge({
     level: 1,
     badgeColor: "text-blue-400 border-blue-500 bg-blue-500/10 shadow-[2px_2px_0px_#3B82F6]",
     icon: "🥚",
-    description: "Beginner runner. Warming up on the desert runway.",
+    description: "Beginner runner. Desert runway warmup.",
   },
   highScore = 0,
   gamesPlayed = 0,
   className,
 }) {
-  // Next tier threshold
   let nextThreshold = 250;
   let nextRankName = "DESERT RUNNER";
   if (highScore >= 1200) {
@@ -40,76 +39,80 @@ export default function DinoRankBadge({
   return (
     <div
       className={cn(
-        "relative p-4 sm:p-5 border-2 border-border/80 bg-card/95 shadow-[4px_4px_0px_#10B981] dark:bg-zinc-950 overflow-hidden",
+        "relative p-5 border-2 border-border/80 bg-card/95 shadow-[4px_4px_0px_#10B981] dark:bg-zinc-950 flex flex-col justify-between overflow-hidden",
         className
       )}
     >
       {/* Background scanline */}
       <div className="scanline-overlay pointer-events-none absolute inset-0 z-10 opacity-20" />
 
-      <div className="relative z-20 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        {/* Left: Rank Tier & Sprite */}
+      <div className="relative z-20 space-y-4">
+        {/* Header: Rank Tier & Sprite */}
         <div className="flex items-center gap-3.5">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center border-2 border-emerald-500/40 bg-zinc-900 text-2xl shadow-[2px_2px_0px_#10B981]">
-            <span role="img" aria-label="rank icon" className="animate-bounce-subtle">
+          <div className="flex h-13 w-13 shrink-0 items-center justify-center border-2 border-emerald-500/40 bg-zinc-900 text-2xl shadow-[2px_2px_0px_#10B981]">
+            <span role="img" aria-label="rank icon">
               {rank.icon || "🦖"}
             </span>
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="font-pixel text-[11px] sm:text-xs uppercase tracking-wider text-emerald-500 dark:text-emerald-400">
+              <span className="font-pixel text-xs uppercase tracking-wider text-emerald-500 dark:text-emerald-400 truncate">
                 {rank.title}
               </span>
-              <span className="border border-border/60 bg-muted/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+              <span className="border border-border/60 bg-muted/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground shrink-0">
                 LVL {rank.level}
               </span>
             </div>
-            <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
-              {rank.description}
+            <p className="mt-0.5 text-xs text-muted-foreground font-sans">
+              {rank.description || "Beginner runner. Desert runway warmup."}
             </p>
           </div>
         </div>
 
-        {/* Middle: Arcade HUD Metrics */}
-        <div className="flex flex-wrap items-center gap-3 sm:gap-4 font-mono text-xs">
-          <div className="border border-border/60 bg-background/80 px-3 py-1.5 shadow-sm">
-            <span className="text-[10px] text-muted-foreground uppercase tracking-widest block font-pixel text-[8px]">
+        {/* 2-Column Metrics Grid */}
+        <div className="grid grid-cols-2 gap-2.5 font-mono text-xs">
+          <div className="border border-border/60 bg-background/80 p-2.5 text-center shadow-xs">
+            <span className="text-[9px] text-muted-foreground uppercase tracking-wider block font-pixel">
               HIGH SCORE
             </span>
-            <span className="font-pixel text-sm text-foreground text-emerald-500 dark:text-emerald-400">
+            <span className="font-pixel text-base text-emerald-500 dark:text-emerald-400 mt-0.5 block">
               {String(highScore).padStart(5, "0")}
             </span>
           </div>
 
-          <div className="border border-border/60 bg-background/80 px-3 py-1.5 shadow-sm">
-            <span className="text-[10px] text-muted-foreground uppercase tracking-widest block font-pixel text-[8px]">
+          <div className="border border-border/60 bg-background/80 p-2.5 text-center shadow-xs">
+            <span className="text-[9px] text-muted-foreground uppercase tracking-wider block font-pixel">
               GAMES RUN
             </span>
-            <span className="font-mono font-bold text-sm text-foreground">
+            <span className="font-mono font-bold text-base text-foreground mt-0.5 block">
               {gamesPlayed}
             </span>
           </div>
-
-          {/* Quick Play CTA */}
-          <Link href="/#dino-game-section" className="inline-block">
-            <PixelButton variant="arcade" size="sm" className="h-9 font-pixel text-[9px]">
-              <Gamepad2 className="h-3.5 w-3.5" />
-              PLAY DINO RUN
-            </PixelButton>
-          </Link>
         </div>
+
+        {/* Quick Play CTA: Full Width */}
+        <Link href="/#dino-game-section" className="block w-full">
+          <PixelButton
+            variant="arcade"
+            size="sm"
+            className="w-full justify-center h-10 font-pixel text-[10px] whitespace-nowrap"
+          >
+            <Gamepad2 className="h-4 w-4 shrink-0" />
+            <span>PLAY DINO RUN</span>
+          </PixelButton>
+        </Link>
       </div>
 
-      {/* Bottom: XP / Progress to next tier */}
+      {/* Bottom XP / Progress to next tier */}
       {nextThreshold && (
         <div className="mt-4 pt-3 border-t border-border/40 relative z-20">
           <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground mb-1.5">
-            <span className="flex items-center gap-1">
-              <Zap className="h-3 w-3 text-amber-500" />
-              <span>Next Rank: <strong className="text-foreground">{nextRankName}</strong></span>
+            <span className="flex items-center gap-1 truncate">
+              <Zap className="h-3 w-3 text-amber-500 shrink-0" />
+              <span>Next: <strong className="text-foreground">{nextRankName}</strong></span>
             </span>
-            <span>
-              {highScore} / {nextThreshold} PTS ({progressPercent}%)
+            <span className="shrink-0 font-mono">
+              {highScore}/{nextThreshold} ({progressPercent}%)
             </span>
           </div>
           <div className="h-2 w-full bg-muted/80 border border-border/60 overflow-hidden">

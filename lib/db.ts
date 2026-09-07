@@ -74,15 +74,25 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, fallback: () => Promise
   const timeoutPromise = new Promise<T>((resolve) => {
     timer = setTimeout(async () => {
       console.warn(`Firestore operation timed out after ${ms}ms, failing over to Local Store`);
-      resolve(await fallback());
+      try {
+        resolve(await fallback());
+      } catch {
+        // fallback failed
+      }
     }, ms);
   });
 
   return Promise.race([
-    promise.then((res) => {
-      clearTimeout(timer);
-      return res;
-    }),
+    promise
+      .then((res) => {
+        clearTimeout(timer);
+        return res;
+      })
+      .catch(async (err) => {
+        clearTimeout(timer);
+        console.warn(`Firestore operation failed (${err?.message || err}), failing over to Local Store`);
+        return await fallback();
+      }),
     timeoutPromise,
   ]);
 };

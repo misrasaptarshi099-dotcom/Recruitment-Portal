@@ -67,6 +67,29 @@ const DEFAULT_ROUND2_PROMPTS = {
   },
 };
 
+function safeToIsoString(val) {
+  if (!val) return new Date().toISOString();
+  if (val instanceof Date) return val.toISOString();
+  if (typeof val?.toDate === "function") {
+    try {
+      return val.toDate().toISOString();
+    } catch {}
+  }
+  if (typeof val === "object") {
+    if (typeof val._seconds === "number") {
+      return new Date(val._seconds * 1000).toISOString();
+    }
+    if (typeof val.seconds === "number") {
+      return new Date(val.seconds * 1000).toISOString();
+    }
+  }
+  try {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d.toISOString();
+  } catch {}
+  return new Date().toISOString();
+}
+
 function calculateDinoRank(highScore = 0) {
   if (highScore >= 1200) {
     return {
@@ -109,55 +132,89 @@ function calculateDinoRank(highScore = 0) {
 }
 
 export async function GET() {
+  let session = null;
   try {
-    const session = await auth.api.getSession({
+    session = await auth.api.getSession({
       headers: await headers(),
     });
+  } catch (err) {
+    console.warn("Session verification warning in profile route:", err);
+  }
 
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-    const email = session.user.email.toLowerCase().trim();
-    const emailKey = email.replace(/[^a-z0-9]/g, "_");
-    const candidateId = `cand_${emailKey}`;
+  const email = session.user.email.toLowerCase().trim();
+  const emailKey = email.replace(/[^a-z0-9]/g, "_");
+  const candidateId = `cand_${emailKey}`;
 
+  try {
     const db = await connect();
 
     // 1. Fetch Candidate Record
-    const candidateDoc = await db.collection("candidates").doc(candidateId).get();
-    const candidateData = candidateDoc.exists ? candidateDoc.data() : null;
+    let candidateData = null;
+    try {
+      const candidateDoc = await db.collection("candidates").doc(candidateId).get();
+      candidateData = candidateDoc && candidateDoc.exists ? candidateDoc.data() : null;
+    } catch (err) {
+      console.warn("Failed to fetch candidate record, falling back:", err?.message || err);
+    }
 
     // 2. Fetch Dino Score
-    const scoreDoc = await db.collection("dinoScores").doc(emailKey).get();
-    const scoreData = scoreDoc.exists ? scoreDoc.data() : {};
-    const highScore = scoreData.highScore || 0;
-    const gamesPlayed = scoreData.gamesPlayed || 0;
+    let scoreData = {};
+    try {
+      const scoreDoc = await db.collection("dinoScores").doc(emailKey).get();
+      scoreData = (scoreDoc && scoreDoc.exists ? scoreDoc.data() : null) || {};
+    } catch (err) {
+      console.warn("Failed to fetch dino score, falling back:", err?.message || err);
+    }
+    const highScore = typeof scoreData.highScore === "number" ? scoreData.highScore : 0;
+    const gamesPlayed = typeof scoreData.gamesPlayed === "number" ? scoreData.gamesPlayed : 0;
     const dinoRank = calculateDinoRank(highScore);
 
-    // 3. Fetch Applications (BCNF primary + legacy formData fallback)
-    const [bcnfAppsSnap, legacyAppsSnap] = await Promise.all([
-      db.collection("applications").where("candidateEmail", "==", email).get(),
-      db.collection("formData").where("Email", "==", email).get(),
-    ]);
+    // 3. Fetch Applications (query both BCNF applications and legacy formData)
+    let bcnfDocs = [];
+    let legacyDocs = [];
+    try {
+      const snap = await db.collection("applications").where("candidateEmail", "==", email).get();
+      bcnfDocs = snap?.docs || [];
+    } catch (err) {
+      console.warn("Query applications by candidateEmail notice:", err?.message || err);
+    }
+
+    try {
+      const snap = await db.collection("formData").where("Email", "==", email).get();
+      legacyDocs = snap?.docs || [];
+    } catch (err) {
+      console.warn("Query formData by Email notice:", err?.message || err);
+    }
+
+    // If case difference might exist, also attempt case-preserved query if empty
+    if (legacyDocs.length === 0 && session.user.email !== email) {
+      try {
+        const snap = await db.collection("formData").where("Email", "==", session.user.email).get();
+        legacyDocs = snap?.docs || [];
+      } catch {}
+    }
 
     // Consolidate applications mapped by departmentSlug
     const appMap = new Map();
 
     // Ingest legacy records first
-    legacyAppsSnap.docs.forEach((doc) => {
-      const data = doc.data() || {};
+    legacyDocs.forEach((doc) => {
+      const data = typeof doc.data === "function" ? doc.data() || {} : doc || {};
       const deptName = (data.Department || "").trim();
       const slug = deptName.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
       if (slug) {
         appMap.set(slug, {
-          id: doc.id,
-          applicationId: doc.id,
+          id: doc.id || doc._id || slug,
+          applicationId: doc.id || doc._id || slug,
           department: deptName,
           departmentSlug: slug,
           shortlisted: Boolean(data.shortlisted || data.Shortlisted),
           status: data.status || (data.shortlisted || data.Shortlisted ? "shortlisted" : "pending"),
-          submittedAt: data.createdAt ? new Date(data.createdAt).toISOString() : new Date().toISOString(),
+          submittedAt: safeToIsoString(data.createdAt),
           round2Task: data.round2Task || null,
           round3Interview: data.round3Interview || null,
         });
@@ -165,20 +222,20 @@ export async function GET() {
     });
 
     // Ingest/overlay normalized BCNF records
-    bcnfAppsSnap.docs.forEach((doc) => {
-      const data = doc.data() || {};
+    bcnfDocs.forEach((doc) => {
+      const data = typeof doc.data === "function" ? doc.data() || {} : doc || {};
       const slug = data.departmentSlug || (data.department || "").toLowerCase().replace(/[^a-z0-9_]/g, "_");
       if (slug) {
         const existing = appMap.get(slug) || {};
         appMap.set(slug, {
           ...existing,
-          id: doc.id,
-          applicationId: data.applicationId || doc.id,
+          id: doc.id || data.applicationId || existing.id || slug,
+          applicationId: data.applicationId || doc.id || existing.applicationId || slug,
           department: data.department || existing.department || slug,
           departmentSlug: slug,
           shortlisted: Boolean(data.shortlisted ?? existing.shortlisted),
           status: data.status || existing.status || "pending",
-          submittedAt: data.submittedAt || data.createdAt || existing.submittedAt,
+          submittedAt: safeToIsoString(data.submittedAt || data.createdAt || existing.submittedAt),
           round2Task: data.round2Task || existing.round2Task || null,
           round3Interview: data.round3Interview || existing.round3Interview || null,
         });
@@ -187,7 +244,7 @@ export async function GET() {
 
     // Normalize applications into 3-Round Progression Model
     const applications = Array.from(appMap.values()).map((app) => {
-      const deptLower = app.department.toLowerCase();
+      const deptLower = (app.department || "").toLowerCase();
       const isTech = TECHNICAL_DEPTS.has(deptLower);
       const deptTone = departmentsData.find((d) => d.name.toLowerCase() === deptLower)?.tone || (isTech ? "#4285F4" : "#0F9D58");
       const defaultTask = DEFAULT_ROUND2_PROMPTS[deptLower] || DEFAULT_ROUND2_PROMPTS.default;
@@ -226,7 +283,6 @@ export async function GET() {
         }
       }
 
-      // Active round index (1, 2, or 3)
       const currentRound = r3Status !== "locked" ? 3 : r2Status !== "locked" ? 2 : 1;
 
       return {
@@ -254,7 +310,7 @@ export async function GET() {
             deadline: app.round2Task?.deadline || defaultTask.deadline,
             deliverableTypes: defaultTask.deliverableTypes,
             submissionUrl: app.round2Task?.submissionUrl || null,
-            submittedAt: app.round2Task?.submittedAt || null,
+            submittedAt: safeToIsoString(app.round2Task?.submittedAt),
             notes: app.round2Task?.notes || null,
           },
           round3: {
@@ -270,19 +326,29 @@ export async function GET() {
       };
     });
 
+    // Resolve candidate personal details with fallbacks from formData
+    const firstLegacyData = legacyDocs[0]
+      ? (typeof legacyDocs[0].data === "function" ? legacyDocs[0].data() : legacyDocs[0])
+      : {};
+
+    const resolvedName = candidateData?.name || firstLegacyData.Name || session.user.name || "Candidate";
+    const resolvedRegNo = candidateData?.registrationNumber || firstLegacyData.RegistrationNumber || "";
+    const resolvedGender = candidateData?.gender || firstLegacyData.Gender || "";
+    const resolvedYear = candidateData?.yearOfStudy || firstLegacyData["Year of Study"] || firstLegacyData.YearOfStudy || "";
+
     return NextResponse.json({
       user: {
-        name: candidateData?.name || session.user.name || "Candidate",
+        name: resolvedName,
         email: email,
-        registrationNumber: candidateData?.registrationNumber || "",
-        gender: candidateData?.gender || "",
-        yearOfStudy: candidateData?.yearOfStudy || "",
+        registrationNumber: resolvedRegNo,
+        gender: resolvedGender,
+        yearOfStudy: resolvedYear,
         avatar: session.user.image || null,
       },
       stats: {
         highScore,
         gamesPlayed,
-        lastPlayed: scoreData.updatedAt || null,
+        lastPlayed: safeToIsoString(scoreData.updatedAt),
         rank: dinoRank,
         totalApplications: applications.length,
         maxApplications: 2,
@@ -290,7 +356,27 @@ export async function GET() {
       applications,
     });
   } catch (error) {
-    console.error("Error generating candidate profile:", error);
-    return NextResponse.json({ error: "Failed to load candidate profile" }, { status: 500 });
+    console.error("Critical error in candidate profile route:", error);
+    // Safe graceful fallback payload so UI never breaks even under unexpected DB anomalies
+    return NextResponse.json({
+      user: {
+        name: session.user.name || "Candidate",
+        email: email,
+        registrationNumber: "",
+        gender: "",
+        yearOfStudy: "",
+        avatar: session.user.image || null,
+      },
+      stats: {
+        highScore: 0,
+        gamesPlayed: 0,
+        lastPlayed: null,
+        rank: calculateDinoRank(0),
+        totalApplications: 0,
+        maxApplications: 2,
+      },
+      applications: [],
+      warning: "Database synchronization delay. Profile telemetry loaded in resilient mode.",
+    });
   }
 }

@@ -8,7 +8,6 @@ import { PixelCard, PixelButton, PixelBadge } from "@/components/design-system";
 import DinoRankBadge from "@/components/profile/DinoRankBadge";
 import RoundProgressStepper from "@/components/profile/RoundProgressStepper";
 import {
-  User,
   Mail,
   Hash,
   Compass,
@@ -19,6 +18,7 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
 } from "lucide-react";
 
 export default function ProfilePage() {
@@ -31,13 +31,15 @@ export default function ProfilePage() {
   const fetchProfile = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await fetch("/api/user/profile");
       if (!res.ok) {
         if (res.status === 401) {
           setProfileData(null);
           return;
         }
-        throw new Error("Failed to load candidate profile");
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || "Failed to load candidate profile");
       }
       const data = await res.json();
       setProfileData(data);
@@ -87,7 +89,7 @@ export default function ProfilePage() {
   };
 
   // --- Loading Skeleton ---
-  if (sessionLoading || loading) {
+  if (sessionLoading || (loading && !profileData && !session?.user)) {
     return (
       <div className="min-h-screen bg-background py-16 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
         <div className="text-center space-y-4 max-w-sm">
@@ -146,8 +148,31 @@ export default function ProfilePage() {
     );
   }
 
-  const { user = {}, stats = {}, applications = [] } = profileData || {};
+  const user = {
+    name: profileData?.user?.name || session?.user?.name || "VIT Student",
+    email: profileData?.user?.email || session?.user?.email || "",
+    registrationNumber: profileData?.user?.registrationNumber || "",
+    gender: profileData?.user?.gender || "",
+    yearOfStudy: profileData?.user?.yearOfStudy || "",
+    avatar: profileData?.user?.avatar || session?.user?.image || null,
+  };
+
+  const stats = profileData?.stats || {
+    highScore: 0,
+    gamesPlayed: 0,
+    rank: {
+      title: "PIXEL CADET",
+      tier: "ROOKIE",
+      level: 1,
+      badgeColor: "text-blue-400 border-blue-500 bg-blue-500/10 shadow-[2px_2px_0px_#3B82F6]",
+      icon: "🥚",
+      description: "Beginner runner. Desert runway warmup.",
+    },
+  };
+
+  const applications = profileData?.applications || [];
   const hasRemainingQuota = applications.length < 2;
+  const userHandle = (user.email ? user.email.split("@")[0] : "STUDENT").toUpperCase();
 
   return (
     <div className="min-h-screen bg-background text-foreground py-10 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
@@ -155,6 +180,20 @@ export default function ProfilePage() {
       <div className="pointer-events-none absolute inset-0 pixel-grid-pattern opacity-15" />
 
       <div className="max-w-6xl mx-auto space-y-8 relative z-20">
+        {/* Connection Warning Banner if fetch had issues */}
+        {error && (
+          <div className="border border-amber-500/60 bg-amber-500/10 p-3.5 flex items-center justify-between gap-3 text-xs font-mono text-amber-500">
+            <span>⚠ Connection note: Telemetry loaded from cache. ({error})</span>
+            <button
+              onClick={() => fetchProfile()}
+              className="flex items-center gap-1 underline font-bold hover:text-amber-400 cursor-pointer"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              RETRY
+            </button>
+          </div>
+        )}
+
         {/* Top Header Bar */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-border/80 pb-6">
           <div>
@@ -163,7 +202,7 @@ export default function ProfilePage() {
                 CANDIDATE STATION
               </PixelBadge>
               <span className="font-mono text-xs text-muted-foreground">
-                {"// ID: "}{user.email?.split("@")[0] || "STUDENT"}
+                {"// ID: "}{userHandle}
               </span>
             </div>
             <h1 className="font-sans font-black text-2xl sm:text-3xl text-foreground tracking-tight">
@@ -188,73 +227,77 @@ export default function ProfilePage() {
         </div>
 
         {/* User Identity HUD Card */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
           {/* Left 2 Cols: Identity Info */}
-          <div className="lg:col-span-2 border-2 border-border/80 bg-card p-5 sm:p-6 shadow-[4px_4px_0px_#4285F4] dark:bg-zinc-950 relative overflow-hidden">
+          <div className="lg:col-span-2 border-2 border-border/80 bg-card p-5 sm:p-6 shadow-[4px_4px_0px_#4285F4] dark:bg-zinc-950 relative overflow-hidden flex flex-col justify-between">
             <div className="scanline-overlay pointer-events-none absolute inset-0 z-10 opacity-20" />
 
-            <div className="relative z-20 flex flex-col sm:flex-row items-start sm:items-center gap-5">
-              {/* Avatar Box */}
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center border-2 border-border bg-muted/60 text-foreground font-pixel text-xl shadow-[2px_2px_0px_currentColor] overflow-hidden">
-                {user.avatar ? (
-                  <Image
-                    src={user.avatar}
-                    alt={user.name || "Avatar"}
-                    width={64}
-                    height={64}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span>{user.name ? user.name[0].toUpperCase() : "U"}</span>
-                )}
-              </div>
-
-              {/* User Bio Details */}
-              <div className="space-y-1.5 flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="font-sans font-bold text-lg sm:text-xl text-foreground truncate">
-                    {user.name || "VIT Student"}
-                  </h2>
-                  <span className="inline-flex items-center gap-1 border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono text-emerald-500 font-semibold">
-                    <ShieldCheck className="h-3 w-3" />
-                    VERIFIED STUDENT
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Mail className="h-3.5 w-3.5 text-blue-500" />
-                    {user.email}
-                  </span>
-                  {user.registrationNumber && (
-                    <span className="flex items-center gap-1">
-                      <Hash className="h-3.5 w-3.5 text-amber-500" />
-                      {user.registrationNumber}
-                    </span>
-                  )}
-                  {user.yearOfStudy && (
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3.5 w-3.5 text-emerald-500" />
-                      Year {user.yearOfStudy}
-                    </span>
+            <div className="relative z-20 space-y-5">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5">
+                {/* Avatar Box */}
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center border-2 border-border bg-muted/60 text-foreground font-pixel text-xl shadow-[2px_2px_0px_currentColor] overflow-hidden">
+                  {user.avatar ? (
+                    <Image
+                      src={user.avatar}
+                      alt={user.name || "Avatar"}
+                      width={64}
+                      height={64}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span>{user.name ? user.name[0].toUpperCase() : "U"}</span>
                   )}
                 </div>
+
+                {/* User Bio Details */}
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-sans font-bold text-lg sm:text-xl text-foreground truncate">
+                      {user.name || "VIT Student"}
+                    </h2>
+                    <span className="inline-flex items-center gap-1 border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono text-emerald-500 font-semibold">
+                      <ShieldCheck className="h-3 w-3" />
+                      VERIFIED STUDENT
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-mono text-muted-foreground">
+                    {user.email && (
+                      <span className="flex items-center gap-1 text-foreground/90">
+                        <Mail className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        <span className="truncate">{user.email}</span>
+                      </span>
+                    )}
+                    {user.registrationNumber && (
+                      <span className="flex items-center gap-1">
+                        <Hash className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                        <span>{user.registrationNumber}</span>
+                      </span>
+                    )}
+                    {user.yearOfStudy && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                        <span>Year {user.yearOfStudy}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* Application Quota Meter */}
-              <div className="border border-border/80 bg-background/90 p-3 sm:text-right shrink-0">
-                <span className="font-pixel text-[8px] uppercase tracking-widest text-muted-foreground block">
+              {/* Application Quota Meter Bar */}
+              <div className="border border-border/80 bg-background/90 p-3 flex items-center justify-between gap-3">
+                <span className="font-pixel text-[8px] uppercase tracking-widest text-muted-foreground">
                   APPLICATION QUOTA
                 </span>
-                <span className="font-pixel text-sm text-foreground">
-                  {applications.length} / 2 USED
+                <span className="font-pixel text-xs text-foreground">
+                  {applications.length} / 2 TRACKS USED
                 </span>
               </div>
             </div>
           </div>
 
           {/* Right Col: Arcade High Score & Rank Tier */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 flex flex-col">
             <DinoRankBadge
               rank={stats.rank}
               highScore={stats.highScore}
@@ -275,35 +318,34 @@ export default function ProfilePage() {
                 Active Track Applications ({applications.length})
               </h3>
             </div>
-            {hasRemainingQuota && (
+            {applications.length === 1 ? (
               <Link href="/departments">
                 <PixelButton variant="outline" size="sm" className="font-pixel text-[9px]">
-                  + APPLY SECOND TRACK
+                  + APPLY 2ND TRACK
                 </PixelButton>
               </Link>
-            )}
+            ) : applications.length === 0 ? (
+              <Link href="/departments">
+                <PixelButton variant="outline" size="sm" className="font-pixel text-[9px]">
+                  + EXPLORE TRACKS
+                </PixelButton>
+              </Link>
+            ) : null}
           </div>
 
           {/* If Candidate has No Applications Yet */}
           {applications.length === 0 ? (
             <PixelCard variant="arcade" scanline={true} className="text-center py-12 px-6">
               <div className="max-w-md mx-auto space-y-4">
-                <pre className="font-mono text-emerald-400 text-xs leading-none select-none mx-auto inline-block">
-{`     ████████
-    ███  ████
-    █████████     🌵
-    ████          ██
-   ███████        ██
-  █  ███  █       ██
-     █ █        ██████
-~~~~~~~~~~~~~~~~~~~~~~~~`}
-                </pre>
+                <div className="mx-auto flex h-16 w-16 items-center justify-center border-2 border-emerald-500/50 bg-zinc-900 text-3xl shadow-[3px_3px_0px_#10B981]">
+                  🦖
+                </div>
                 <div>
                   <h4 className="font-sans font-bold text-lg text-foreground">
                     No Active Applications Registered
                   </h4>
-                  <p className="font-mono text-xs text-muted-foreground mt-1 leading-relaxed">
-                    You haven&apos;t applied to any GDG departments yet. You can submit up to <strong>2 applications</strong> across Technical and Creative/Management tracks.
+                  <p className="font-mono text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                    You haven&apos;t applied to any GDG departments yet. You are eligible to submit up to <strong>2 applications</strong> across Technical and Creative/Management tracks.
                   </p>
                 </div>
                 <div className="pt-2">
@@ -355,7 +397,7 @@ export default function ProfilePage() {
                           onClick={() =>
                             setExpandedApp(expandedApp === app.applicationId ? null : app.applicationId)
                           }
-                          className="flex items-center gap-1.5 border border-border/80 bg-muted/60 px-2.5 py-1 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
+                          className="flex items-center gap-1.5 border border-border/80 bg-muted/60 px-2.5 py-1 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                         >
                           <Layers className="h-3.5 w-3.5" />
                           <span>{expandedApp === app.applicationId ? "Hide Details" : "View Submission"}</span>
@@ -414,7 +456,7 @@ export default function ProfilePage() {
               ))}
 
               {/* Second Quota Available Notice */}
-              {hasRemainingQuota && (
+              {hasRemainingQuota && applications.length > 0 && (
                 <div className="border border-dashed border-border/80 bg-muted/20 p-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
                   <div className="space-y-1">
                     <span className="font-pixel text-[9px] text-emerald-500 uppercase tracking-wider">
