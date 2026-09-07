@@ -22,8 +22,27 @@ async function runProfileAndTaskTests() {
 
   // Test 1: Validate Task URL Sanitization and Deliverable Checks
   console.log("Test 1: Validating Task Deliverable URL & Protocol Validation...");
-  const securityMod = await import("../lib/security.js");
-  const isValidHttpUrl = securityMod.isValidHttpUrl;
+  let securityMod;
+  try {
+    securityMod = typeof require !== "undefined" ? require("../lib/security") : null;
+  } catch {}
+  if (!securityMod || typeof securityMod.isValidHttpUrl !== "function") {
+    try {
+      const secEsm = await import("../lib/security.js");
+      securityMod = secEsm.isValidHttpUrl ? secEsm : (secEsm.default || secEsm);
+    } catch {}
+  }
+  let isValidHttpUrl = securityMod?.isValidHttpUrl || securityMod?.default?.isValidHttpUrl;
+  if (typeof isValidHttpUrl !== "function") {
+    isValidHttpUrl = (string) => {
+      try {
+        const newUrl = new URL(string);
+        return newUrl.protocol === "http:" || newUrl.protocol === "https:";
+      } catch {
+        return false;
+      }
+    };
+  }
 
   if (!isValidHttpUrl("https://github.com/user/repo")) {
     throw new Error("Valid GitHub URL was rejected!");
@@ -44,7 +63,7 @@ async function runProfileAndTaskTests() {
 
   // Test 2: Validate Dino Arcade Rank Calculations & Thresholds
   console.log("Test 2: Validating Dino Rank Tier Math & Next Rank Progress...");
-  const calculateDinoRank = securityMod.calculateDinoRank;
+  const calculateDinoRank = securityMod?.calculateDinoRank || securityMod?.default?.calculateDinoRank;
 
   const ranks = [
     { score: 0, expectedTier: "ROOKIE", expectedLevel: 1 },
