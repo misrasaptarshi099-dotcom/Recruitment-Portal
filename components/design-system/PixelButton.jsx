@@ -22,6 +22,9 @@ function playArcadeBeep() {
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
     osc.connect(gain);
     gain.connect(ctx.destination);
+    osc.onended = () => {
+      ctx.close().catch(() => {});
+    };
     osc.start();
     osc.stop(ctx.currentTime + 0.04);
   } catch {
@@ -55,6 +58,7 @@ const sizes = {
 };
 
 export default function PixelButton({
+  as: Component = "button",
   children,
   variant = "primary",
   size = "md",
@@ -65,6 +69,7 @@ export default function PixelButton({
   className,
   onClick,
   disabled,
+  type = "button",
   ...props
 }) {
   const handleClick = (e) => {
@@ -74,9 +79,12 @@ export default function PixelButton({
     if (onClick) onClick(e);
   };
 
+  const isButton = Component === "button";
+
   return (
-    <button
-      disabled={disabled || loading}
+    <Component
+      {...(isButton ? { type, disabled: disabled || loading } : {})}
+      aria-disabled={disabled || loading ? true : undefined}
       onClick={handleClick}
       className={cn(
         "group relative inline-flex items-center justify-center font-display font-semibold tracking-wide transition-transform duration-75 select-none active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:pointer-events-none disabled:opacity-50",
@@ -103,6 +111,6 @@ export default function PixelButton({
           )}
         </>
       )}
-    </button>
+    </Component>
   );
 }

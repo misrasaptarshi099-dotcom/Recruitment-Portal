@@ -169,24 +169,30 @@ function createQuery(collectionName: string, items: any[]) {
   };
 }
 
+let transactionQueue: Promise<any> = Promise.resolve();
+
 export const localDb = {
   runTransaction: async (updateFunction: (transaction: any) => Promise<any>) => {
-    // Transaction wrapper ensuring synchronous read-modify-write atomicity
-    const transaction = {
-      get: async (docRef: any) => {
-        return docRef.get();
-      },
-      set: async (docRef: any, data: any, options?: any) => {
-        return docRef.set(data, options);
-      },
-      update: async (docRef: any, patch: any) => {
-        return docRef.update(patch);
-      },
-      delete: async (docRef: any) => {
-        return docRef.delete?.();
-      },
-    };
-    return await updateFunction(transaction);
+    // Transaction wrapper ensuring serialized read-modify-write atomicity across concurrent calls
+    const nextInQueue = transactionQueue.catch(() => {}).then(async () => {
+      const transaction = {
+        get: async (docRef: any) => {
+          return docRef.get();
+        },
+        set: async (docRef: any, data: any, options?: any) => {
+          return docRef.set(data, options);
+        },
+        update: async (docRef: any, patch: any) => {
+          return docRef.update(patch);
+        },
+        delete: async (docRef: any) => {
+          return docRef.delete?.();
+        },
+      };
+      return await updateFunction(transaction);
+    });
+    transactionQueue = nextInQueue;
+    return await nextInQueue;
   },
   collection: (collectionName: string) => {
     return {

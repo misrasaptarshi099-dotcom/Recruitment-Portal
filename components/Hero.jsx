@@ -59,25 +59,25 @@ export default function Hero() {
 
             {/* Primary Action Buttons */}
             <div className="flex flex-wrap items-center gap-4 pt-2">
-              <Link href="/departments">
-                <PixelButton
-                  variant="technical"
-                  size="lg"
-                  trailingIcon={ArrowRight}
-                >
-                  Explore Department Trees
-                </PixelButton>
-              </Link>
+              <PixelButton
+                as={Link}
+                href="/departments"
+                variant="technical"
+                size="lg"
+                trailingIcon={ArrowRight}
+              >
+                Explore Department Trees
+              </PixelButton>
 
-              <Link href="/profile">
-                <PixelButton
-                  variant="outline"
-                  size="lg"
-                  icon={User}
-                >
-                  My Profile & Rounds
-                </PixelButton>
-              </Link>
+              <PixelButton
+                as={Link}
+                href="/profile"
+                variant="outline"
+                size="lg"
+                icon={User}
+              >
+                My Profile & Rounds
+              </PixelButton>
             </div>
           </div>
 

@@ -72,32 +72,41 @@ export async function POST(req) {
 
     const db = await connect();
     const scoreRef = db.collection("dinoScores").doc(emailKey);
-    const scoreDoc = await scoreRef.get();
 
-    let currentHigh = 0;
-    let gamesPlayed = 0;
+    const { newHigh, gamesPlayed } = await db.runTransaction(async (transaction) => {
+      const scoreDoc = await transaction.get(scoreRef);
 
-    if (scoreDoc.exists) {
-      const data = scoreDoc.data() || {};
-      currentHigh = data.highScore || 0;
-      gamesPlayed = (data.gamesPlayed || 0) + 1;
-    } else {
-      gamesPlayed = 1;
-    }
+      let currentHigh = 0;
+      let gamesCount = 0;
 
-    const newHigh = Math.max(currentHigh, score);
+      if (scoreDoc.exists) {
+        const data = scoreDoc.data() || {};
+        currentHigh = data.highScore || 0;
+        gamesCount = (data.gamesPlayed || 0) + 1;
+      } else {
+        gamesCount = 1;
+      }
 
-    await scoreRef.set(
-      {
-        email,
-        candidateName: session.user.name || "Candidate",
-        highScore: newHigh,
-        lastScore: score,
-        gamesPlayed,
-        updatedAt: now,
-      },
-      { merge: true }
-    );
+      const calculatedHigh = Math.max(currentHigh, score);
+
+      transaction.set(
+        scoreRef,
+        {
+          email,
+          candidateName: session.user.name || "Candidate",
+          highScore: calculatedHigh,
+          lastScore: score,
+          gamesPlayed: gamesCount,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+
+      return {
+        newHigh: calculatedHigh,
+        gamesPlayed: gamesCount,
+      };
+    });
 
     return NextResponse.json({
       success: true,

@@ -220,6 +220,7 @@ export default function DinoGame({
   className,
 }) {
   const canvasRef = useRef(null);
+  const keysRef = useRef({ jump: false, duck: false });
   const [gameState, setGameState] = useState("idle"); // "idle" | "playing" | "gameover"
   const [currentScore, setCurrentScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
@@ -327,37 +328,45 @@ export default function DinoGame({
     let obstacleTimer = 0;
 
     // Input tracker
-    const keys = {
-      jump: false,
-      duck: false,
+    const keys = keysRef.current;
+
+    const isEditableElement = (el) => {
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
     };
 
     const handleKeyDown = (e) => {
+      if (isEditableElement(e.target)) return;
+
       if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") {
         e.preventDefault();
         sfx.init();
         if (gameState === "idle" || gameState === "gameover") {
           startGame();
+          keysRef.current.jump = true;
           return;
         }
-        keys.jump = true;
+        keysRef.current.jump = true;
       }
       if (e.code === "ArrowDown" || e.code === "KeyS") {
         e.preventDefault();
-        keys.duck = true;
+        keysRef.current.duck = true;
       }
     };
 
     const handleKeyUp = (e) => {
+      if (isEditableElement(e.target)) return;
+
       if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") {
-        keys.jump = false;
+        keysRef.current.jump = false;
         // Early release cuts upward jump arc for tactile jump control
         if (dino.vy < -4) {
           dino.vy = -4;
         }
       }
       if (e.code === "ArrowDown" || e.code === "KeyS") {
-        keys.duck = false;
+        keysRef.current.duck = false;
       }
     };
 
@@ -723,9 +732,15 @@ export default function DinoGame({
           onTouchStart={() => {
             sfx.init();
             if (gameState !== "playing") startGame();
+            keysRef.current.jump = true;
             window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space" }));
           }}
           onTouchEnd={() => {
+            keysRef.current.jump = false;
+            window.dispatchEvent(new KeyboardEvent("keyup", { code: "Space" }));
+          }}
+          onTouchCancel={() => {
+            keysRef.current.jump = false;
             window.dispatchEvent(new KeyboardEvent("keyup", { code: "Space" }));
           }}
           className="flex-1 py-2 font-pixel text-[10px] bg-foreground text-background border border-foreground text-center active:bg-foreground/80 mr-2"
@@ -735,9 +750,17 @@ export default function DinoGame({
         <button
           type="button"
           onTouchStart={() => {
+            sfx.init();
+            if (gameState !== "playing") startGame();
+            keysRef.current.duck = true;
             window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowDown" }));
           }}
           onTouchEnd={() => {
+            keysRef.current.duck = false;
+            window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowDown" }));
+          }}
+          onTouchCancel={() => {
+            keysRef.current.duck = false;
             window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowDown" }));
           }}
           className="flex-1 py-2 font-pixel text-[10px] bg-muted border border-border text-center active:bg-muted/60"

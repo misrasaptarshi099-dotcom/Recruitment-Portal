@@ -185,17 +185,19 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
 
     saveTimeoutRef.current = setTimeout(() => {
       if (isSubmittedRef.current) return;
-      const savePromise = (async () => {
-        try {
-          await saveDraftAsync(draftKey, {
-            values: watchedValues,
-            submittedDepartments,
-          });
-        } catch (err) {
-          console.error("Failed to auto-save draft:", err);
-        }
-      })();
-      activeSavePromiseRef.current = savePromise;
+      activeSavePromiseRef.current = activeSavePromiseRef.current
+        .catch(() => {})
+        .then(async () => {
+          if (isSubmittedRef.current) return;
+          try {
+            await saveDraftAsync(draftKey, {
+              values: watchedValues,
+              submittedDepartments,
+            });
+          } catch (err) {
+            console.error("Failed to auto-save draft:", err);
+          }
+        });
     }, 500);
 
     return () => {

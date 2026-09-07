@@ -153,13 +153,25 @@ export default function SignInPage() {
     setSubmitting(true);
     setDinoState("loading");
     try {
-      await authClient.signIn.social({
+      const res = await authClient.signIn.social({
         provider: "google",
         callbackURL: "/",
       });
+      if (res?.error) {
+        console.error("Google sign-in error:", res.error);
+        toast.error(
+          res.error.message ||
+            "Sign-in failed. Please ensure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are configured in .env.local."
+        );
+        setDinoState("error");
+        setSubmitting(false);
+      }
     } catch (err) {
       console.error("Google sign-in error:", err);
-      toast.error(err?.message || "Sign-in failed. Please ensure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are configured in .env.local.");
+      toast.error(
+        err?.message ||
+          "Sign-in failed. Please ensure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are configured in .env.local."
+      );
       setDinoState("error");
       setSubmitting(false);
     }

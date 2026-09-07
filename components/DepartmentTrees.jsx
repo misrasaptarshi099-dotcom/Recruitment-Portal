@@ -136,7 +136,10 @@ function TreeBranch({
       </div>
 
       {/* ── Department card (pixelates in) ── */}
-      <motion.div
+      <motion.button
+        type="button"
+        aria-pressed={isSelected}
+        disabled={isSubmitted}
         style={{
           opacity: cardOpacity,
           scale: cardScale,
@@ -144,7 +147,7 @@ function TreeBranch({
         }}
         onClick={() => !isSubmitted && onToggle(dept.name)}
         className={cn(
-          "relative flex-1 p-5 sm:p-6 border-2 transition-colors duration-200 select-none cursor-pointer group/card",
+          "relative flex-1 p-5 sm:p-6 border-2 transition-colors duration-200 select-none cursor-pointer group/card w-full text-left",
           isSubmitted
             ? "border-border/40 bg-muted/20 opacity-60 cursor-not-allowed"
             : isSelected
@@ -216,7 +219,7 @@ function TreeBranch({
           <span>{isSubmitted ? "COMPLETED" : isSelected ? "SLOT FILLED — READY" : "CLICK TO SELECT"}</span>
           <ArrowRight className="h-3.5 w-3.5 group-hover/card:translate-x-1 transition-transform" />
         </div>
-      </motion.div>
+      </motion.button>
     </div>
   );
 }

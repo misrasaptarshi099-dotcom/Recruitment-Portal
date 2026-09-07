@@ -80,9 +80,96 @@ async function runCachingAndDraftTests() {
     throw new Error("Draft was not properly removed!");
   }
 
+  // Test 5: Chained Draft Writes, Newest Values, and Final Cleanup
+  console.log("Test 5: Validating chained draft writes, newest values, and final cleanup...");
+  let chain = Promise.resolve();
+  let isSubmitted = false;
+
+  const queueSave = (data, delayMs) => {
+    chain = chain.catch(() => {}).then(async () => {
+      if (isSubmitted) return;
+      await new Promise((r) => setTimeout(r, delayMs));
+      if (isSubmitted) return;
+      await saveDraftAsync("chain_test_key", data);
+    });
+  };
+
+  // Queue an older write with 30ms delay, followed immediately by a newer write with 10ms delay
+  queueSave({ values: { Name: "Write 1 (older)" }, updatedAt: 100 }, 30);
+  queueSave({ values: { Name: "Write 2 (newest)" }, updatedAt: 200 }, 10);
+
+  await chain;
+
+  const resultDraft = await loadDraftAsync("chain_test_key");
+  if (resultDraft?.values?.Name !== "Write 2 (newest)") {
+    throw new Error(`Expected newest draft value 'Write 2 (newest)', got: ${JSON.stringify(resultDraft)}`);
+  }
+
+  // Simulate submission: mark isSubmitted, queue write, await chain, remove draft
+  isSubmitted = true;
+  queueSave({ values: { Name: "Write 3 (should be aborted)" }, updatedAt: 300 }, 10);
+  await chain;
+  await removeDraftAsync("chain_test_key");
+
+  const finalDraft = await loadDraftAsync("chain_test_key");
+  if (finalDraft !== null) {
+    throw new Error("Draft was recreated after submission cleanup!");
+  }
+  console.log("  ✓ Chained draft writes, newest value retention & final cleanup verified.");
+
   delete global.window;
   delete global.localStorage;
   console.log("  ✓ Draft Store offline persistence, timestamp tracking & removal verified.");
+
+  // Test 6: Concurrent Dino Score Atomic Transactions
+  console.log("Test 6: Validating concurrent dino-score transactions & high-score retention...");
+  const { connect } = await import("../lib/db.ts");
+  const db = await connect();
+  const testDinoUser = `dino_concurrency_${Date.now()}`;
+  const scoreRef = db.collection("dinoScores").doc(testDinoUser);
+
+  const simulatePostScore = async (score) => {
+    return await db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(scoreRef);
+      const data = doc.exists ? (doc.data() || {}) : {};
+      const currentHigh = data.highScore || 0;
+      const gamesCount = (data.gamesPlayed || 0) + 1;
+      const newHigh = Math.max(currentHigh, score);
+
+      transaction.set(
+        scoreRef,
+        {
+          highScore: newHigh,
+          lastScore: score,
+          gamesPlayed: gamesCount,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+
+      return { newHigh, gamesPlayed: gamesCount };
+    });
+  };
+
+  // Launch 5 concurrent transactions with different scores
+  await Promise.all([
+    simulatePostScore(450),
+    simulatePostScore(980),
+    simulatePostScore(120),
+    simulatePostScore(670),
+    simulatePostScore(310),
+  ]);
+
+  const finalScoreDoc = await scoreRef.get();
+  const finalScoreData = finalScoreDoc.data();
+
+  if (finalScoreData.gamesPlayed !== 5) {
+    throw new Error(`Expected exactly 5 gamesPlayed under concurrency, got: ${finalScoreData.gamesPlayed}`);
+  }
+  if (finalScoreData.highScore !== 980) {
+    throw new Error(`Expected highest highScore 980, got: ${finalScoreData.highScore}`);
+  }
+  console.log(`  ✓ Concurrent score atomic transactions verified (gamesPlayed: ${finalScoreData.gamesPlayed}, highScore: ${finalScoreData.highScore})`);
 
   console.log("\n>>> ALL PHASE 3 CACHING & METADATA TESTS PASSED! <<<");
 }
