@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isUserAdmin } from "@/lib/security";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { loadRoleConfig, authorizeDepartmentAccess } from "@/lib/admin-auth";
+import { sendDecisionEmail } from "@/lib/mailer";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +35,10 @@ export async function POST(req, { params }) {
       );
     }
 
-    if (!isUserAdmin(session.user)) {
+    const db = await connect();
+    const roleConfig = await loadRoleConfig(db);
+
+    if (!isUserAdmin(session.user, roleConfig)) {
       return NextResponse.json(
         { success: false, message: "Forbidden: Administrator privileges required" },
         { status: 403 }
@@ -58,7 +63,6 @@ export async function POST(req, { params }) {
       );
     }
 
-    const db = await connect();
     const docRef = db.collection("formData").doc(id);
     const snapshot = await docRef.get();
 
@@ -69,11 +73,64 @@ export async function POST(req, { params }) {
       );
     }
 
+    const applicantData = snapshot.data() || {};
+    const applicantDept = applicantData.Department || applicantData.department || "";
+
+    // Department scoping guard
+    const deptAuth = authorizeDepartmentAccess(session.user, applicantDept, roleConfig);
+    if (!deptAuth.authorized) {
+      return NextResponse.json(
+        { success: false, message: deptAuth.reason },
+        { status: 403 }
+      );
+    }
+
+    const applicantEmail = (applicantData.Email || applicantData.email || "").trim();
+    const candidateName = applicantData.FullName || applicantData.fullName || applicantData.Name || applicantData.name || "Candidate";
+
+    if (!applicantEmail) {
+      return NextResponse.json(
+        { success: false, message: "Applicant has no registered email address" },
+        { status: 400 }
+      );
+    }
+
+    // Determine specific round outcome
+    let decision = "rejected";
+    if (round === "round1") {
+      const isShortlisted = Boolean(applicantData.shortlisted || applicantData.Shortlisted);
+      decision = isShortlisted ? "shortlisted" : "rejected";
+    } else if (round === "round2") {
+      const isCleared = Boolean(applicantData.round2Cleared || applicantData.status === "round2_cleared" || applicantData.status === "accepted");
+      decision = isCleared ? "cleared" : "rejected";
+    } else if (round === "round3") {
+      const isSelected = Boolean(applicantData.status === "accepted" || applicantData.status === "selected" || applicantData.round3Cleared);
+      decision = isSelected ? "selected" : "rejected";
+    }
+
+    // Dispatch real email via central mailer
+    const mailResult = await sendDecisionEmail({
+      to: applicantEmail,
+      candidateName,
+      department: applicantDept,
+      round,
+      decision,
+    });
+
+    if (!mailResult.success && !mailResult.simulated) {
+      return NextResponse.json(
+        { success: false, message: mailResult.message || "Failed to deliver email to candidate" },
+        { status: 500 }
+      );
+    }
+
     const fieldName = `${round}MailSent`;
     const fieldTimestamp = `${round}MailSentAt`;
+    const fieldMessageId = `${round}MailMessageId`;
     const updatePayload = {
       [fieldName]: true,
       [fieldTimestamp]: new Date().toISOString(),
+      [fieldMessageId]: mailResult.messageId || (mailResult.simulated ? "simulated" : "sent"),
     };
 
     await docRef.update(updatePayload);
@@ -95,9 +152,10 @@ export async function POST(req, { params }) {
       ...serializeFirestoreData(updatedSnap.data()),
     };
 
+    const statusBadge = mailResult.simulated ? "Simulated" : "Delivered";
     return NextResponse.json({
       success: true,
-      message: `Decision notification for ${round} marked as sent (Simulated). Decision is permanently locked.`,
+      message: `Decision notification for ${round} dispatched (${statusBadge} to ${applicantEmail}). Decision is permanently locked.`,
       data: applicant,
     });
   } catch (error) {
@@ -108,3 +166,4 @@ export async function POST(req, { params }) {
     );
   }
 }
+

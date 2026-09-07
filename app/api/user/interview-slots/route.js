@@ -3,6 +3,7 @@ import { connect } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { sendInterviewConfirmationEmail } from "@/lib/mailer";
 
 export const dynamic = "force-dynamic";
 
@@ -207,13 +208,29 @@ export async function POST(req) {
         });
       }
 
-      return interviewDetails;
+      return {
+        interviewDetails,
+        department: formData.Department || formData.department || "GDG Department",
+        candidateName: formData.FullName || formData.fullName || session.user.name || "Candidate",
+      };
     });
+
+    // Automatically dispatch booking confirmation email with meeting link to candidate
+    try {
+      await sendInterviewConfirmationEmail({
+        to: email,
+        candidateName: result.candidateName,
+        department: result.department,
+        slotDetails: result.interviewDetails,
+      });
+    } catch (mailErr) {
+      console.warn("Could not dispatch interview confirmation email:", mailErr?.message || mailErr);
+    }
 
     return NextResponse.json({
       success: true,
-      message: "Interview slot reserved successfully! Meeting details are now available on your profile.",
-      data: result,
+      message: "Interview slot reserved successfully! Meeting details and confirmation have been sent to your email.",
+      data: result.interviewDetails,
     });
   } catch (error) {
     console.error("Error reserving interview slot:", error);

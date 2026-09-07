@@ -33,7 +33,7 @@ import { CSVLink } from "react-csv";
 import { CSV_Header } from "@/constants";
 import { Lock, Mail } from "lucide-react";
 
-export default function DataTable({ data = [], onDataUpdate }) {
+export default function DataTable({ data = [], onDataUpdate, allowedDepartments }) {
   const [tableData, setTableData] = useState(data);
   const [selectedDept, setSelectedDept] = useState("All");
   const [selectedShortlisted, setSelectedShortlisted] = useState("All");
@@ -73,7 +73,7 @@ export default function DataTable({ data = [], onDataUpdate }) {
         });
         const json = await res.json().catch(() => ({}));
         if (res.ok) {
-          toast.success("✉️ Round 1 decision email dispatched (Simulated). Decision is permanently locked!");
+          toast.success(json.message || "✉️ Round 1 decision email dispatched! Decision is permanently locked.");
           setTableData((prev) =>
             prev.map((app) =>
               app._id === id || app.id === id
@@ -345,7 +345,7 @@ export default function DataTable({ data = [], onDataUpdate }) {
             type="number"
             min="1"
           />
-          <FilterDepartment filterFunc={filterFunc} />
+          <FilterDepartment filterFunc={filterFunc} allowedDepartments={allowedDepartments} />
           <FilterShortlisted filterFunc={shortlistedFilterFunc} />
           <Button variant="outline" size="sm" onClick={resetAllFilters} className="rounded-xl gap-1.5">
             <GrPowerReset className="h-3.5 w-3.5" />

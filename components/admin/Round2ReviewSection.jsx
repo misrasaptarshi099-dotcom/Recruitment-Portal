@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 
-export default function Round2ReviewSection({ data = [], onDataUpdate }) {
+export default function Round2ReviewSection({ data = [], onDataUpdate, allowedDepartments }) {
   const [search, setSearch] = useState("");
   const [selectedDept, setSelectedDept] = useState("All");
   const [selectedStatus, setSelectedStatus] = useState("All");
@@ -252,9 +252,9 @@ export default function Round2ReviewSection({ data = [], onDataUpdate }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ round: "round2" }),
         });
-        const json = await res.json();
+        const json = await res.json().catch(() => ({}));
         if (res.ok) {
-          toast.success("✉️ Round 2 decision email dispatched (Simulated). Decision is permanently locked!");
+          toast.success(json.message || "✉️ Round 2 decision email dispatched! Decision is permanently locked.");
           if (onDataUpdate) onDataUpdate(id, { round2MailSent: true, round2MailSentAt: new Date().toISOString() });
         } else {
           toast.error(json.message || "Failed to send decision email");
@@ -336,7 +336,7 @@ export default function Round2ReviewSection({ data = [], onDataUpdate }) {
               min="1"
               value={pageSize}
             />
-            <FilterDepartment filterFunc={(dept) => { setSelectedDept(dept || "All"); setPageIndex(0); }} />
+            <FilterDepartment filterFunc={(dept) => { setSelectedDept(dept || "All"); setPageIndex(0); }} allowedDepartments={allowedDepartments} />
 
             <select
               value={selectedStatus}

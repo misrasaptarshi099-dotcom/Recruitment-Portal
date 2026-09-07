@@ -7,9 +7,11 @@ import DataTable from "./DataTable";
 import Round2ReviewSection from "./admin/Round2ReviewSection";
 import Round3ReviewSection from "./admin/Round3ReviewSection";
 import DeadlineConfigModal from "./admin/DeadlineConfigModal";
-import { ShieldAlert, Lock, ArrowRight, Loader2, Layers, FileCode2, Users, CheckCircle2, Calendar, Clock } from "lucide-react";
+import AdminRoleManagerModal from "./admin/AdminRoleManagerModal";
+import { ShieldAlert, Lock, ArrowRight, Loader2, Layers, FileCode2, Users, CheckCircle2, Calendar, Clock, Crown, Shield, UserCog, Mail } from "lucide-react";
 import { isUserAdmin } from "@/lib/security";
 import DinoRunningLoader from "./DinoRunningLoader";
+import { toast } from "sonner";
 
 function UnauthorizedView() {
   return (
@@ -66,12 +68,36 @@ function AccessDeniedView() {
   );
 }
 
-export default function AdminContent({ applicants }) {
+export default function AdminContent({
+  applicants,
+  userRole = "super_admin",
+  assignedDepartments = [],
+  isSuperAdmin: isSuperAdminProp = true,
+}) {
   const { data: session, isPending } = authClient.useSession();
   const [activeRound, setActiveRound] = React.useState("round1");
   const [applicantsData, setApplicantsData] = React.useState(applicants || []);
   const [deadlineModalOpen, setDeadlineModalOpen] = React.useState(false);
+  const [roleManagerOpen, setRoleManagerOpen] = React.useState(false);
+  const [checkingSmtp, setCheckingSmtp] = React.useState(false);
   const user = session?.user;
+
+  const handleCheckSmtp = async () => {
+    setCheckingSmtp(true);
+    try {
+      const res = await fetch("/api/admin/smtp-status");
+      const json = await res.json();
+      if (res.ok && json.success) {
+        toast.success(`✅ SMTP Connected: ${json.sender}`);
+      } else {
+        toast.error(`❌ SMTP Issue: ${json.message}`);
+      }
+    } catch (err) {
+      toast.error("Failed to connect to SMTP server");
+    } finally {
+      setCheckingSmtp(false);
+    }
+  };
 
   React.useEffect(() => {
     setApplicantsData(applicants || []);
@@ -108,6 +134,62 @@ export default function AdminContent({ applicants }) {
 
   const renderContent = () => (
     <div className="w-full space-y-6">
+      {/* Role Badge + Super Admin Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Role Badge */}
+        <div className="flex items-center gap-2">
+          {isSuperAdminProp ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-500 border border-amber-500/20">
+              <Crown className="h-3.5 w-3.5" />
+              <span>Super Admin · Full Access</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-500 border border-cyan-500/20">
+              <Shield className="h-3.5 w-3.5" />
+              <span>Manager · {(assignedDepartments || []).join(", ")}</span>
+            </span>
+          )}
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex items-center gap-2">
+          {/* Check SMTP Connection */}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={checkingSmtp}
+            onClick={handleCheckSmtp}
+            className="rounded-xl gap-2 border-border/80 hover:border-blue-500/50 py-5 px-3.5 text-xs font-mono shrink-0 shadow-xs cursor-pointer"
+          >
+            {checkingSmtp ? (
+              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+            ) : (
+              <Mail className="h-4 w-4 text-blue-500" />
+            )}
+            <div className="text-left hidden sm:block">
+              <span className="block font-bold text-foreground">SMTP Test</span>
+              <span className="block text-[10px] text-muted-foreground">Verify Mailer</span>
+            </div>
+          </Button>
+
+          {/* Manage Roles button — Available for Super Admins and Department Managers */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRoleManagerOpen(true)}
+            className="rounded-xl gap-2 border-amber-500/40 text-amber-400 hover:bg-amber-500/10 py-5 px-4 text-xs font-mono shrink-0 shadow-xs cursor-pointer"
+          >
+            <UserCog className="h-4 w-4 text-amber-500" />
+            <div className="text-left">
+              <span className="block font-bold text-foreground">Manage Roles</span>
+              <span className="block text-[10px] text-muted-foreground">
+                {isSuperAdminProp ? "Global Permissions" : `${(assignedDepartments || []).join(", ") || "Dept"} Permissions`}
+              </span>
+            </div>
+          </Button>
+        </div>
+      </div>
+
       {/* 3-Round Stage Navigation Tabs + Global Deadline Trigger */}
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-border/60 bg-card/40 p-2 backdrop-blur-sm flex-1">
@@ -211,6 +293,7 @@ export default function AdminContent({ applicants }) {
         </button>
         </div>
 
+        {/* Set Deadlines — Available for both Super Admins and Department Managers */}
         <Button
           variant="outline"
           size="sm"
@@ -220,7 +303,9 @@ export default function AdminContent({ applicants }) {
           <Clock className="h-4 w-4 text-blue-500" />
           <div className="text-left">
             <span className="block font-bold text-foreground">Set Deadlines</span>
-            <span className="block text-[10px] text-muted-foreground">Round 1 & Round 2</span>
+            <span className="block text-[10px] text-muted-foreground">
+              {isSuperAdminProp ? "All Departments" : assignedDepartments.join(", ") || "Department"}
+            </span>
           </div>
         </Button>
       </div>
@@ -236,7 +321,11 @@ export default function AdminContent({ applicants }) {
               Application Review & Shortlisting
             </h2>
           </div>
-          <DataTable data={applicantsData} onDataUpdate={handleDataUpdate} />
+          <DataTable
+            data={applicantsData}
+            onDataUpdate={handleDataUpdate}
+            allowedDepartments={isSuperAdminProp ? null : assignedDepartments}
+          />
         </div>
       )}
 
@@ -250,7 +339,11 @@ export default function AdminContent({ applicants }) {
               Practical Task Submissions & Deliverables
             </h2>
           </div>
-          <Round2ReviewSection data={applicantsData} onDataUpdate={handleDataUpdate} />
+          <Round2ReviewSection
+            data={applicantsData}
+            onDataUpdate={handleDataUpdate}
+            allowedDepartments={isSuperAdminProp ? null : assignedDepartments}
+          />
         </div>
       )}
 
@@ -264,7 +357,11 @@ export default function AdminContent({ applicants }) {
               Interview Scheduling & Final Committee Decisions
             </h2>
           </div>
-          <Round3ReviewSection data={applicantsData} onDataUpdate={handleDataUpdate} />
+          <Round3ReviewSection
+            data={applicantsData}
+            onDataUpdate={handleDataUpdate}
+            allowedDepartments={isSuperAdminProp ? null : assignedDepartments}
+          />
         </div>
       )}
 
@@ -272,6 +369,16 @@ export default function AdminContent({ applicants }) {
       <DeadlineConfigModal
         isOpen={deadlineModalOpen}
         onClose={() => setDeadlineModalOpen(false)}
+        allowedDepartments={assignedDepartments}
+        isSuperAdmin={isSuperAdminProp}
+      />
+
+      {/* Admin Role Manager Modal */}
+      <AdminRoleManagerModal
+        isOpen={roleManagerOpen}
+        onClose={() => setRoleManagerOpen(false)}
+        allowedDepartments={assignedDepartments}
+        isSuperAdmin={isSuperAdminProp}
       />
     </div>
   );
@@ -286,14 +393,18 @@ export default function AdminContent({ applicants }) {
     );
   }
 
-  if (!user) {
+  if (!user && !userRole) {
     return <UnauthorizedView />;
   }
 
-  if (!isUserAdmin(user)) {
+  const isAuthorized =
+    userRole === "super_admin" ||
+    userRole === "dept_manager" ||
+    isUserAdmin(user);
+
+  if (!isAuthorized) {
     return <AccessDeniedView />;
   }
 
   return renderContent();
 }
-

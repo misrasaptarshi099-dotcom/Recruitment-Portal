@@ -314,21 +314,40 @@ async function runProfileAndTaskTests() {
 
   console.log("  ✓ Round 2 evaluation & Round 3 interview lifecycle updates verified.");
 
-  // Test 6: Round 1 & Round 2 Deadline Persistence
-  console.log("Test 6: Validating Round 1 & Round 2 Deadline Configuration...");
+  // Test 6: Round 1 & Round 2 Per-Department Deadline Persistence
+  console.log("Test 6: Validating Round 1 & Round 2 Per-Department Deadline Configuration...");
   const testDeadlineDocId = `test_deadlines_${Date.now()}`;
   const deadlinePayload = {
-    round1Deadline: "2026-09-15T23:59:00.000Z",
-    round2Deadline: "2026-09-20T23:59:00.000Z",
+    departments: {
+      "Web Dev": {
+        round1Deadline: "2026-09-15T23:59:00.000Z",
+        round2Deadline: "2026-09-20T23:59:00.000Z",
+        updatedAt: new Date().toISOString(),
+        updatedBy: "web_lead@gdg.org",
+      },
+      "Data Science": {
+        round1Deadline: "2026-09-18T23:59:00.000Z",
+        round2Deadline: "2026-09-25T23:59:00.000Z",
+        updatedAt: new Date().toISOString(),
+        updatedBy: "ds_lead@gdg.org",
+      },
+    },
     updatedAt: new Date().toISOString(),
   };
   try {
     await db.collection("recruitment_config").doc(testDeadlineDocId).set(deadlinePayload);
     const snapDeadlines = await db.collection("recruitment_config").doc(testDeadlineDocId).get();
-    if (snapDeadlines.data().round1Deadline !== deadlinePayload.round1Deadline) {
-      throw new Error("Round 1 deadline configuration failed to persist!");
+    const stored = snapDeadlines.data();
+    if (stored.departments?.["Web Dev"]?.round1Deadline !== "2026-09-15T23:59:00.000Z") {
+      throw new Error("Web Dev Round 1 deadline configuration failed to persist!");
     }
-    console.log("  ✓ Round 1 & Round 2 deadline configuration verified.");
+    if (stored.departments?.["Data Science"]?.round1Deadline !== "2026-09-18T23:59:00.000Z") {
+      throw new Error("Data Science Round 1 deadline configuration failed to persist!");
+    }
+    if (stored.departments?.["Web Dev"]?.round2Deadline === stored.departments?.["Data Science"]?.round2Deadline) {
+      throw new Error("Department deadline isolation failed!");
+    }
+    console.log("  ✓ Per-department Round 1 & Round 2 deadline configuration verified.");
   } finally {
     await db.collection("recruitment_config").doc(testDeadlineDocId).delete().catch(() => {});
   }
@@ -497,10 +516,86 @@ async function runProfileAndTaskTests() {
 
   console.log("  ✓ Per-round Send Mail decision state locking verified (decisions unlocked before mail, locked after mail).");
 
-  console.log("\n>>> ALL PHASE 5 & 6 INTERVIEW SLOTS, DEADLINES & TASK TESTS PASSED! <<<");
+  // Test 10: Validate Central Email Notification Engine & Templates
+  console.log("Test 10: Validating Central Mailer Engine, Templates & Dispatch Handlers...");
+  const { verifySmtpConnection, sendDecisionEmail, sendInterviewConfirmationEmail, sendBatchAnnouncementEmail } = await import("../lib/mailer.js");
+
+  const smtpCheck = await verifySmtpConnection();
+  if (typeof smtpCheck.configured !== "boolean") {
+    throw new Error("SMTP connection check failed to return expected structure!");
+  }
+
+  // Verify Round 1 Shortlisted Email
+  const r1ShortlistResult = await sendDecisionEmail({
+    to: "test.candidate@vitstudent.ac.in",
+    candidateName: "Test Student",
+    department: "Web Dev",
+    round: "round1",
+    decision: "shortlisted",
+  });
+  if (!r1ShortlistResult.success) {
+    throw new Error("Round 1 shortlist email dispatch failed!");
+  }
+
+  // Verify Round 2 Cleared Email
+  const r2ClearedResult = await sendDecisionEmail({
+    to: "test.candidate@vitstudent.ac.in",
+    candidateName: "Test Student",
+    department: "App Dev",
+    round: "round2",
+    decision: "cleared",
+  });
+  if (!r2ClearedResult.success) {
+    throw new Error("Round 2 cleared email dispatch failed!");
+  }
+
+  // Verify Round 3 Final Offer Email
+  const r3OfferResult = await sendDecisionEmail({
+    to: "test.candidate@vitstudent.ac.in",
+    candidateName: "Test Student",
+    department: "Machine Learning",
+    round: "round3",
+    decision: "selected",
+  });
+  if (!r3OfferResult.success) {
+    throw new Error("Round 3 offer email dispatch failed!");
+  }
+
+  // Verify Interview Slot Booking Confirmation Email
+  const slotConfirmResult = await sendInterviewConfirmationEmail({
+    to: "test.candidate@vitstudent.ac.in",
+    candidateName: "Test Student",
+    department: "Web Dev",
+    slotDetails: {
+      date: "2026-09-12",
+      slotLabel: "04:30 PM - 04:45 PM",
+      meetingLink: "https://meet.google.com/xyz-gdg-slot",
+    },
+  });
+  if (!slotConfirmResult.success) {
+    throw new Error("Interview slot confirmation email dispatch failed!");
+  }
+
+  // Verify Batch Announcement Email Template
+  const batchResult = await sendBatchAnnouncementEmail({
+    recipients: [
+      { Email: "test.batch1@vitstudent.ac.in", Name: "Student One", Department: "Web Dev" },
+      { Email: "test.batch2@vitstudent.ac.in", Name: "Student Two", Department: "App Dev" },
+    ],
+    subject: "Important GDG Announcement",
+    bodyTemplate: "Hello #name, thank you for joining #dept orientation!",
+  });
+  if (!batchResult.success) {
+    throw new Error("Batch announcement email dispatch failed!");
+  }
+
+  console.log("  ✓ Central Mailer engine, decision templates, slot booking confirmation & batch broadcast verified.");
+
+  console.log("\n>>> ALL PHASE 5 & 6 INTERVIEW SLOTS, DEADLINES, TASKS & MAILER TESTS PASSED! <<<");
 }
 
 runProfileAndTaskTests().catch((err) => {
   console.error("Phase 5 tests failed:", err);
   process.exit(1);
 });
+

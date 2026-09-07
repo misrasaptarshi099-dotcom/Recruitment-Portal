@@ -2,8 +2,9 @@ import { connect, serializeFirestoreData } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { isUserAdmin } from "@/lib/security";
+import { isUserAdmin, getUserAdminRole } from "@/lib/security";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { loadRoleConfig } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -43,24 +44,107 @@ export async function GET(req) {
       );
     }
 
-    if (!isUserAdmin(session.user)) {
+    const db = await connect();
+    const roleConfig = await loadRoleConfig(db);
+
+    if (!isUserAdmin(session.user, roleConfig)) {
       return NextResponse.json(
         { error: "Forbidden: Administrator role required" },
         { status: 403 }
       );
     }
 
-    // 3. Authorized Data Retrieval
-    const db = await connect();
-    const snapshot = await db.collection("formData").get();
-    const applicants = snapshot.docs.map((doc) => ({
+    const { searchParams } = new URL(req.url);
+    const requestedLimit = parseInt(searchParams.get("limit") || "0", 10);
+    const cursor = searchParams.get("cursor");
+    const requestedDept = searchParams.get("department");
+
+    // 3. Department scoping for dept_managers
+    const { role, departments } = getUserAdminRole(session.user, roleConfig);
+    const isDeptManager = role === "dept_manager";
+
+    let query = db.collection("formData");
+
+    if (requestedDept) {
+      if (isDeptManager && !departments.includes(requestedDept)) {
+        return NextResponse.json(
+          { error: "Forbidden: You do not have access to this department" },
+          { status: 403 }
+        );
+      }
+      query = query.where("Department", "==", requestedDept);
+    } else if (isDeptManager) {
+      if (departments.length === 1) {
+        query = query.where("Department", "==", departments[0]);
+      } else if (departments.length > 1 && departments.length <= 10) {
+        query = query.where("Department", "in", departments);
+      }
+    }
+
+    // Apply cursor-based pagination if limit is requested
+    let hasMore = false;
+    let nextCursor = null;
+
+    if (requestedLimit > 0) {
+      const pageLimit = Math.min(Math.max(requestedLimit, 1), 200);
+      let pagedQuery = query.orderBy("__name__").limit(pageLimit + 1);
+
+      if (cursor) {
+        const cursorDoc = await db.collection("formData").doc(cursor).get();
+        if (cursorDoc.exists) {
+          pagedQuery = pagedQuery.startAfter(cursorDoc);
+        }
+      }
+
+      const snapshot = await pagedQuery.get();
+      const docs = snapshot.docs;
+      hasMore = docs.length > pageLimit;
+      const returnDocs = hasMore ? docs.slice(0, pageLimit) : docs;
+
+      let applicants = returnDocs.map((doc) => ({
+        id: doc.id,
+        _id: doc.id,
+        ...serializeFirestoreData(doc.data()),
+      }));
+
+      // Filter in-memory fallback if departments > 10 for dept_manager
+      if (isDeptManager && departments.length > 10 && !requestedDept) {
+        applicants = applicants.filter((a) => departments.includes(a.Department));
+      }
+
+      if (returnDocs.length > 0) {
+        nextCursor = returnDocs[returnDocs.length - 1].id;
+      }
+
+      return NextResponse.json(
+        {
+          applicants,
+          hasMore,
+          nextCursor: hasMore ? nextCursor : null,
+          totalCount: applicants.length,
+        },
+        {
+          headers: {
+            "X-RateLimit-Remaining": limit.remaining.toString(),
+          },
+        }
+      );
+    }
+
+    // Default full fetch
+    const snapshot = await query.get();
+    let applicants = snapshot.docs.map((doc) => ({
       id: doc.id,
       _id: doc.id,
       ...serializeFirestoreData(doc.data()),
     }));
 
+    if (isDeptManager && !requestedDept && departments.length > 10) {
+      applicants = applicants.filter((a) => departments.includes(a.Department));
+    }
+
     return NextResponse.json(
-      { applicants },
+      { applicants, totalCount: applicants.length },
       {
         headers: {
           "X-RateLimit-Remaining": limit.remaining.toString(),

@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import InterviewSlotManagerModal from "./InterviewSlotManagerModal";
 
-export default function Round3ReviewSection({ data = [], onDataUpdate }) {
+export default function Round3ReviewSection({ data = [], onDataUpdate, allowedDepartments }) {
   const [search, setSearch] = useState("");
   const [selectedDept, setSelectedDept] = useState("All");
   const [selectedStatus, setSelectedStatus] = useState("All");
@@ -243,9 +243,9 @@ export default function Round3ReviewSection({ data = [], onDataUpdate }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ round: "round3" }),
         });
-        const json = await res.json();
+        const json = await res.json().catch(() => ({}));
         if (res.ok) {
-          toast.success("✉️ Round 3 final decision email dispatched (Simulated). Decision is permanently locked!");
+          toast.success(json.message || "✉️ Round 3 final decision email dispatched! Decision is permanently locked.");
           if (onDataUpdate) onDataUpdate(id, { round3MailSent: true, round3MailSentAt: new Date().toISOString() });
         } else {
           toast.error(json.message || "Failed to send decision email");
@@ -327,7 +327,7 @@ export default function Round3ReviewSection({ data = [], onDataUpdate }) {
               min="1"
               value={pageSize}
             />
-            <FilterDepartment filterFunc={(dept) => { setSelectedDept(dept || "All"); setPageIndex(0); }} />
+            <FilterDepartment filterFunc={(dept) => { setSelectedDept(dept || "All"); setPageIndex(0); }} allowedDepartments={allowedDepartments} />
 
             <select
               value={selectedStatus}
@@ -608,7 +608,8 @@ export default function Round3ReviewSection({ data = [], onDataUpdate }) {
       <InterviewSlotManagerModal
         isOpen={slotConfigModalOpen}
         onClose={() => setSlotConfigModalOpen(false)}
-        defaultDepartment={selectedDept !== "All" ? selectedDept : "Web Dev"}
+        defaultDepartment={selectedDept !== "All" ? selectedDept : (allowedDepartments?.length === 1 ? allowedDepartments[0] : "Web Dev")}
+        allowedDepartments={allowedDepartments}
         onSlotsUpdated={() => {
           // If parent provided onDataUpdate or refresh
         }}

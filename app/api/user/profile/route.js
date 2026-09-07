@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { connect } from "@/lib/db";
 import { departmentsData } from "@/constants/departments-data";
+import { isAdminEmail } from "@/lib/security";
+import { loadRoleConfig, purgeRevokedNonInstitutionalUser } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -115,6 +117,19 @@ export async function GET() {
 
   try {
     const db = await connect();
+
+    // Enforce Institutional Domain: Only @vitstudent.ac.in permitted for candidate profiles
+    if (!email.endsWith("@vitstudent.ac.in") && !isAdminEmail(email)) {
+      const roleConfig = await loadRoleConfig(db);
+      const isDynamicAdmin = Boolean(roleConfig?.assignments && roleConfig.assignments[email]);
+      if (!isDynamicAdmin) {
+        await purgeRevokedNonInstitutionalUser(db, email);
+        return NextResponse.json(
+          { error: "Forbidden: Candidate accounts must use @vitstudent.ac.in. Non-institutional account without active admin privileges has been deleted." },
+          { status: 403 }
+        );
+      }
+    }
 
     // 1. Fetch Candidate Record
     let candidateData = null;
@@ -328,8 +343,21 @@ export async function GET() {
 
       const currentRound = r3Status !== "locked" ? 3 : r2Status !== "locked" ? 2 : 1;
 
+      // Resolve per-department deadlines for this candidate's specific department
+      const deptKey = app.department || "";
+      const deptDeadlineConfig =
+        recruitmentDeadlines.departments?.[deptKey] ||
+        recruitmentDeadlines.departments?.[app.departmentSlug] ||
+        {};
+
+      const effectiveR1Deadline =
+        deptDeadlineConfig.round1Deadline ||
+        recruitmentDeadlines.round1Deadline ||
+        null;
+
       const effectiveR2Deadline =
         app.round2Task?.deadline ||
+        deptDeadlineConfig.round2Deadline ||
         recruitmentDeadlines.round2Deadlines?.[app.departmentSlug] ||
         recruitmentDeadlines.round2Deadline ||
         defaultTask.deadline;
@@ -350,7 +378,7 @@ export async function GET() {
             title: "Application & Portfolio Screening",
             status: r1Status,
             description: "Initial evaluation of essay answers, previous projects, and candidate profile.",
-            deadline: recruitmentDeadlines.round1Deadline || null,
+            deadline: effectiveR1Deadline,
           },
           round2: {
             name: "ROUND 02",
