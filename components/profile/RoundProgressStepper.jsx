@@ -8,52 +8,50 @@ import TaskSubmissionDrawer from "./TaskSubmissionDrawer";
 const statusConfigs = {
   cleared: {
     label: "PASSED",
-    color: "text-emerald-500 border-emerald-500 bg-emerald-500/10 shadow-[2px_2px_0px_#10B981]",
+    color: "text-emerald-400 border-emerald-500/40 bg-emerald-500/10",
     icon: Check,
-    indicatorColor: "bg-emerald-500",
   },
   accepted: {
-    label: "ACCEPTED",
-    color: "text-emerald-400 border-emerald-500 bg-emerald-500/20 shadow-[2px_2px_0px_#10B981]",
+    label: "SELECTED",
+    color: "text-emerald-400 border-emerald-500/50 bg-emerald-500/20",
     icon: Check,
-    indicatorColor: "bg-emerald-500",
   },
   in_review: {
     label: "IN REVIEW",
-    color: "text-amber-500 border-amber-500 bg-amber-500/10 shadow-[2px_2px_0px_#FBBC04]",
+    color: "text-amber-400 border-amber-500/40 bg-amber-500/10",
     icon: Clock,
-    indicatorColor: "bg-amber-500",
   },
   submitted: {
     label: "SUBMITTED",
-    color: "text-blue-400 border-blue-500 bg-blue-500/10 shadow-[2px_2px_0px_#4285F4]",
+    color: "text-blue-400 border-blue-500/40 bg-blue-500/10",
     icon: Check,
-    indicatorColor: "bg-blue-500",
   },
   pending_submission: {
     label: "ACTION REQUIRED",
-    color: "text-emerald-400 border-emerald-500 bg-emerald-500/15 animate-pulse shadow-[2px_2px_0px_#10B981]",
+    color: "text-emerald-400 border-emerald-500 bg-emerald-500/15 animate-pulse",
     icon: AlertTriangle,
-    indicatorColor: "bg-emerald-500",
   },
   scheduled: {
-    label: "INTERVIEW SET",
-    color: "text-cyan-400 border-cyan-500 bg-cyan-500/10 shadow-[2px_2px_0px_#06B6D4]",
+    label: "SCHEDULED",
+    color: "text-cyan-400 border-cyan-500/40 bg-cyan-500/10",
     icon: Calendar,
-    indicatorColor: "bg-cyan-500",
   },
   rejected: {
-    label: "NOT CLEARED",
-    color: "text-rose-500 border-rose-500 bg-rose-500/10 shadow-[2px_2px_0px_#EA4335]",
+    label: "NOT SELECTED",
+    color: "text-rose-400 border-rose-500/40 bg-rose-500/10",
     icon: XCircle,
-    indicatorColor: "bg-rose-500",
   },
   locked: {
     label: "LOCKED",
-    color: "text-muted-foreground border-border/80 bg-muted/40",
+    color: "text-muted-foreground/60 border-border/40 bg-muted/20",
     icon: Lock,
-    indicatorColor: "bg-muted-foreground",
   },
+};
+
+const stageNames = {
+  round1: "01 · Screening",
+  round2: "02 · Practical Task",
+  round3: "03 · Interview",
 };
 
 export default function RoundProgressStepper({
@@ -64,187 +62,156 @@ export default function RoundProgressStepper({
   className,
 }) {
   const roundList = [
-    { key: "round1", ...rounds.round1, number: "01" },
-    { key: "round2", ...rounds.round2, number: "02" },
-    { key: "round3", ...rounds.round3, number: "03" },
+    { key: "round1", ...rounds.round1 },
+    { key: "round2", ...rounds.round2 },
+    { key: "round3", ...rounds.round3 },
   ];
 
   return (
-    <div className={cn("space-y-4", className)}>
-      {/* Horizontal Checkpoint Track */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 relative">
-        {roundList.map((round, idx) => {
-          const cfg = statusConfigs[round.status] || statusConfigs.locked;
-          const Icon = cfg.icon;
-          const isCurrentActive = round.status === "pending_submission" || round.status === "in_review" || round.status === "scheduled";
+    <div className={cn("grid grid-cols-1 md:grid-cols-3 gap-3", className)}>
+      {roundList.map((round) => {
+        const cfg = statusConfigs[round.status] || statusConfigs.locked;
+        const Icon = cfg.icon;
+        const isLocked = round.status === "locked";
+        const isActive = round.status === "in_review" || round.status === "pending_submission" || round.status === "scheduled";
+        const isActionRequired = round.status === "pending_submission";
 
-          return (
-            <div
-              key={round.key}
-              className={cn(
-                "relative p-4 border-2 transition-all duration-300 bg-card/90 dark:bg-zinc-950 flex flex-col justify-between",
-                isCurrentActive
-                  ? "border-foreground/80 shadow-[4px_4px_0px_#4285F4] dark:shadow-[4px_4px_0px_#10B981]"
-                  : round.status === "cleared" || round.status === "accepted"
-                  ? "border-emerald-500/50 shadow-[3px_3px_0px_#0F9D58]"
-                  : round.status === "rejected"
-                  ? "border-rose-500/50 opacity-75"
-                  : "border-border/60 opacity-60"
-              )}
-            >
-              {/* Top Station Tag */}
-              <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-2.5 mb-2.5">
-                <div className="flex items-center gap-1.5 font-pixel text-[9px] uppercase tracking-wider text-muted-foreground">
-                  <span>STAGE {round.number}</span>
-                </div>
-                <div
-                  className={cn(
-                    "flex items-center gap-1.5 px-2 py-0.5 font-pixel text-[8px] uppercase tracking-widest border",
-                    cfg.color
-                  )}
-                >
-                  <Icon className="h-3 w-3 shrink-0" />
-                  <span>{cfg.label}</span>
-                </div>
-              </div>
-
-              {/* Title & Description */}
-              <div className="space-y-1 mb-3">
-                <h4 className="font-sans font-bold text-sm text-foreground">
-                  {round.title}
-                </h4>
-                <p className="text-xs text-muted-foreground font-sans line-clamp-2">
-                  {round.description}
-                </p>
-              </div>
-
-              {/* Round-Specific Detail Box */}
-              <div className="pt-2 border-t border-border/40 text-xs font-mono">
-                {/* Round 1 Context */}
-                {round.key === "round1" && (
-                  <div className="text-[11px] text-muted-foreground">
-                    {round.status === "cleared" ? (
-                      <span className="text-emerald-500 dark:text-emerald-400 font-semibold">
-                        ✓ Screening criteria satisfied. Proceeding to Task Stage.
-                      </span>
-                    ) : round.status === "rejected" ? (
-                      <span className="text-rose-500">
-                        Application was not advanced to Round 2.
-                      </span>
-                    ) : (
-                      <span>Core committee reviewing your questionnaire responses.</span>
-                    )}
-                  </div>
+        return (
+          <div
+            key={round.key}
+            className={cn(
+              "p-4 border transition-all duration-200 bg-background/50 flex flex-col justify-between min-h-[96px]",
+              isActive
+                ? "border-emerald-500/60 bg-card/80 shadow-[2px_2px_0px_#10B981]"
+                : isLocked
+                ? "border-border/40 opacity-50"
+                : "border-border/70 bg-card/40"
+            )}
+          >
+            {/* Header: Stage name & Status pill */}
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono font-semibold text-xs text-foreground/90 uppercase tracking-wide">
+                {stageNames[round.key] || round.key}
+              </span>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 px-2 py-0.5 font-pixel text-[8px] uppercase tracking-wider border shrink-0",
+                  cfg.color
                 )}
-
-                {/* Round 2 Context & Submission Trigger */}
-                {round.key === "round2" && (
-                  <div className="space-y-2">
-                    {round.status === "pending_submission" && (
-                      <div className="space-y-2">
-                        <div className="text-[11px] text-amber-500 font-semibold">
-                          ⚠ Task assigned: {round.taskPrompt}
-                        </div>
-                        <TaskSubmissionDrawer
-                          applicationId={applicationId}
-                          departmentName={departmentName}
-                          round2Data={round}
-                          onSuccess={onTaskSubmitted}
-                        />
-                      </div>
-                    )}
-
-                    {round.status === "submitted" && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-muted-foreground">Deliverable:</span>
-                          <a
-                            href={round.submissionUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-500 hover:underline flex items-center gap-1 font-semibold truncate max-w-[140px]"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                            View Link
-                          </a>
-                        </div>
-                        <TaskSubmissionDrawer
-                          applicationId={applicationId}
-                          departmentName={departmentName}
-                          round2Data={round}
-                          onSuccess={onTaskSubmitted}
-                        />
-                      </div>
-                    )}
-
-                    {round.status === "cleared" && (
-                      <span className="text-emerald-500 dark:text-emerald-400 font-semibold text-[11px]">
-                        ✓ Task deliverable verified and scored. Advanced to Interview.
-                      </span>
-                    )}
-
-                    {round.status === "locked" && (
-                      <span className="text-muted-foreground text-[11px]">
-                        Unlocks upon clearing Round 01 screening.
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Round 3 Context */}
-                {round.key === "round3" && (
-                  <div className="space-y-1.5 text-[11px]">
-                    {round.status === "scheduled" && (
-                      <div className="border border-cyan-500/30 bg-cyan-500/10 p-2 text-cyan-400 space-y-1">
-                        <div className="font-bold flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>Slot: {round.slotTime}</span>
-                        </div>
-                        {round.venue && <div>Venue: {round.venue}</div>}
-                        {round.meetLink && (
-                          <a
-                            href={round.meetLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-cyan-300 underline font-bold mt-1"
-                          >
-                            <Video className="h-3 w-3" />
-                            Join Video Call
-                          </a>
-                        )}
-                      </div>
-                    )}
-
-                    {round.status === "accepted" && (
-                      <div className="border border-emerald-500/40 bg-emerald-500/15 p-2 font-pixel text-[9px] text-emerald-400 uppercase tracking-wider text-center">
-                        🎉 SELECTED TO GDG COMMITTEE
-                      </div>
-                    )}
-
-                    {round.status === "rejected" && (
-                      <span className="text-rose-500">
-                        Process concluded for this track.
-                      </span>
-                    )}
-
-                    {round.status === "locked" && (
-                      <span className="text-muted-foreground">
-                        Unlocks upon task review & evaluation.
-                      </span>
-                    )}
-
-                    {round.status === "in_review" && (
-                      <span className="text-muted-foreground">
-                        Interview deliberations in progress.
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
+              >
+                <Icon className="h-2.5 w-2.5 shrink-0" />
+                <span>{cfg.label}</span>
+              </span>
             </div>
-          );
-        })}
-      </div>
+
+            {/* Content: Only shown when active or relevant, avoiding clutter */}
+            <div className="mt-2 text-xs font-mono">
+              {/* Round 1 (Screening) */}
+              {round.key === "round1" && (
+                <div className="text-muted-foreground text-[11px]">
+                  {round.status === "cleared" ? (
+                    <span className="text-emerald-400 font-medium">Screening passed</span>
+                  ) : round.status === "rejected" ? (
+                    <span className="text-rose-400">Not shortlisted</span>
+                  ) : (
+                    <span>Application under review</span>
+                  )}
+                </div>
+              )}
+
+              {/* Round 2 (Task) */}
+              {round.key === "round2" && (
+                <div>
+                  {isActionRequired && (
+                    <div className="space-y-2 mt-1">
+                      <div className="text-[11px] text-amber-400 font-medium truncate">
+                        {round.taskPrompt || "Task Assigned"}
+                      </div>
+                      <TaskSubmissionDrawer
+                        applicationId={applicationId}
+                        departmentName={departmentName}
+                        round2Data={round}
+                        onSuccess={onTaskSubmitted}
+                      />
+                    </div>
+                  )}
+
+                  {round.status === "submitted" && (
+                    <div className="flex items-center justify-between gap-2 mt-1">
+                      <a
+                        href={round.submissionUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:underline inline-flex items-center gap-1 text-[11px] truncate max-w-[120px]"
+                      >
+                        <ExternalLink className="h-3 w-3 shrink-0" />
+                        <span>View Link</span>
+                      </a>
+                      <TaskSubmissionDrawer
+                        applicationId={applicationId}
+                        departmentName={departmentName}
+                        round2Data={round}
+                        onSuccess={onTaskSubmitted}
+                      />
+                    </div>
+                  )}
+
+                  {round.status === "cleared" && (
+                    <span className="text-emerald-400 font-medium text-[11px]">
+                      Task evaluated & passed
+                    </span>
+                  )}
+
+                  {isLocked && (
+                    <span className="text-muted-foreground/60 text-[11px]">
+                      Unlocks after Round 1
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Round 3 (Interview) */}
+              {round.key === "round3" && (
+                <div>
+                  {round.status === "scheduled" && (
+                    <div className="text-[11px] text-cyan-400 space-y-1">
+                      <div>Slot: {round.slotTime}</div>
+                      {round.venue && <div className="text-muted-foreground">{round.venue}</div>}
+                      {round.meetLink && (
+                        <a
+                          href={round.meetLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 underline font-bold text-cyan-300"
+                        >
+                          <Video className="h-3 w-3 shrink-0" />
+                          <span>Join Meet</span>
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {round.status === "accepted" && (
+                    <span className="text-emerald-400 font-pixel text-[9px] uppercase">
+                      🎉 Welcome to GDG!
+                    </span>
+                  )}
+
+                  {round.status === "rejected" && (
+                    <span className="text-rose-400 text-[11px]">Concluded</span>
+                  )}
+
+                  {isLocked && (
+                    <span className="text-muted-foreground/60 text-[11px]">
+                      Unlocks after Round 2
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

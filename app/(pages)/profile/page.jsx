@@ -359,94 +359,79 @@ export default function ProfilePage() {
               </div>
             </PixelCard>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {applications.map((app) => (
                 <div
                   key={app.applicationId}
-                  className="border-2 border-border/80 bg-card p-5 sm:p-6 shadow-[5px_5px_0px_currentColor] dark:bg-zinc-950 relative overflow-hidden"
-                  style={{ color: app.tone || "#4285F4" }}
+                  className="border border-border/80 bg-card/95 p-5 sm:p-6 shadow-xs dark:bg-zinc-950/90 relative overflow-hidden pl-6"
                 >
-                  <div className="scanline-overlay pointer-events-none absolute inset-0 z-10 opacity-15" />
+                  {/* Subtle track tone accent stripe on the left edge */}
+                  <div
+                    className="absolute left-0 top-0 bottom-0 w-1"
+                    style={{ backgroundColor: app.tone || "#4285F4" }}
+                  />
 
-                  <div className="relative z-20 space-y-6 text-foreground">
+                  <div className="relative z-20 space-y-4 text-foreground">
                     {/* App Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-3">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-sans font-bold text-lg text-foreground">
+                            {app.department}
+                          </h4>
                           <span
-                            className="font-pixel text-[9px] uppercase tracking-wider px-2 py-0.5 border"
+                            className="font-pixel text-[8px] uppercase tracking-wider px-2 py-0.5 border"
                             style={{
-                              borderColor: app.tone,
-                              color: app.tone,
-                              backgroundColor: `${app.tone}15`,
+                              borderColor: `${app.tone}40`,
+                              color: app.tone || "#4285F4",
+                              backgroundColor: `${app.tone}12`,
                             }}
                           >
-                            {app.isTechnical ? "TECHNICAL TRACK" : "MANAGEMENT / CREATIVE"}
-                          </span>
-                          <span className="font-mono text-[11px] text-muted-foreground">
-                            Applied: {new Date(app.submittedAt).toLocaleDateString()}
+                            {app.isTechnical ? "Technical" : "Creative & Operations"}
                           </span>
                         </div>
-                        <h4 className="font-sans font-black text-xl text-foreground">
-                          {app.department}
-                        </h4>
+                        <p className="font-mono text-[11px] text-muted-foreground">
+                          Applied: {new Date(app.submittedAt).toLocaleDateString()}
+                        </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() =>
-                            setExpandedApp(expandedApp === app.applicationId ? null : app.applicationId)
-                          }
-                          className="flex items-center gap-1.5 border border-border/80 bg-muted/60 px-2.5 py-1 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                        >
-                          <Layers className="h-3.5 w-3.5" />
-                          <span>{expandedApp === app.applicationId ? "Hide Details" : "View Submission"}</span>
-                          {expandedApp === app.applicationId ? (
-                            <ChevronUp className="h-3 w-3" />
-                          ) : (
-                            <ChevronDown className="h-3 w-3" />
-                          )}
-                        </button>
-                      </div>
+                      <button
+                        onClick={() =>
+                          setExpandedApp(expandedApp === app.applicationId ? null : app.applicationId)
+                        }
+                        className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors cursor-pointer self-start sm:self-auto"
+                      >
+                        <Layers className="h-3.5 w-3.5" />
+                        <span>{expandedApp === app.applicationId ? "Hide Record" : "View Record"}</span>
+                        {expandedApp === app.applicationId ? (
+                          <ChevronUp className="h-3 w-3" />
+                        ) : (
+                          <ChevronDown className="h-3 w-3" />
+                        )}
+                      </button>
                     </div>
 
                     {/* 3-Round Progress Stepper */}
-                    <div>
-                      <div className="font-pixel text-[9px] uppercase tracking-wider text-muted-foreground mb-3">
-                        [PROGRESSION_STAGE // ROUNDS_01_THROUGH_03]
-                      </div>
-                      <RoundProgressStepper
-                        applicationId={app.applicationId}
-                        departmentName={app.department}
-                        rounds={app.rounds}
-                        onTaskSubmitted={(newTask) =>
-                          handleTaskSubmitted(app.applicationId, newTask)
-                        }
-                      />
-                    </div>
+                    <RoundProgressStepper
+                      applicationId={app.applicationId}
+                      departmentName={app.department}
+                      rounds={app.rounds}
+                      onTaskSubmitted={(newTask) =>
+                        handleTaskSubmitted(app.applicationId, newTask)
+                      }
+                    />
 
                     {/* Expandable Submission Details */}
                     {expandedApp === app.applicationId && (
-                      <div className="pt-4 border-t border-border/40 font-mono text-xs space-y-2 bg-muted/30 p-4">
-                        <span className="font-pixel text-[9px] uppercase text-muted-foreground block">
-                          SYSTEM DOSSIER // APPLICANT RECORD
-                        </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-muted-foreground">
+                      <div className="pt-3 border-t border-border/30 font-mono text-xs bg-muted/20 p-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-muted-foreground text-[11px]">
                           <div>
-                            <strong>Application ID:</strong>{" "}
+                            <span className="text-muted-foreground/80">Application ID:</span>{" "}
                             <span className="text-foreground">{app.applicationId}</span>
                           </div>
                           <div>
-                            <strong>Candidate Key:</strong>{" "}
+                            <span className="text-muted-foreground/80">Candidate:</span>{" "}
                             <span className="text-foreground">{user.email}</span>
-                          </div>
-                          <div>
-                            <strong>Initial Screening Status:</strong>{" "}
-                            <span className="text-foreground uppercase">{app.rounds.round1.status}</span>
-                          </div>
-                          <div>
-                            <strong>Active Evaluation Stage:</strong>{" "}
-                            <span className="text-foreground">Round {app.currentRound}</span>
                           </div>
                         </div>
                       </div>
