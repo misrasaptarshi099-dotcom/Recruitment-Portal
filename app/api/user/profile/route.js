@@ -207,6 +207,37 @@ export async function GET() {
       const deptName = (data.Department || "").trim();
       const slug = deptName.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
       if (slug) {
+        let answers = [];
+        if (Array.isArray(data.QuestionDetails) && data.QuestionDetails.length > 0) {
+          answers = data.QuestionDetails.map((q) => ({
+            key: q.key || q.question || "q",
+            question: q.question || q.key || "Question",
+            answer: String(q.answer ?? ""),
+          }));
+        } else if (data.Questions && typeof data.Questions === "object") {
+          if (Array.isArray(data.Questions)) {
+            answers = data.Questions.map((q, idx) => {
+              if (Array.isArray(q)) {
+                return { key: `q_${idx}`, question: q[0] || `Question ${idx + 1}`, answer: String(q[1] ?? "") };
+              }
+              if (q && typeof q === "object") {
+                return {
+                  key: q.key || `q_${idx}`,
+                  question: q.question || q.questionText || `Question ${idx + 1}`,
+                  answer: String(q.answer ?? q.value ?? q.text ?? ""),
+                };
+              }
+              return { key: `q_${idx}`, question: `Question ${idx + 1}`, answer: String(q ?? "") };
+            });
+          } else {
+            answers = Object.entries(data.Questions).map(([k, v]) => ({
+              key: k,
+              question: k.replace(/_/g, " "),
+              answer: String(v ?? ""),
+            }));
+          }
+        }
+
         appMap.set(slug, {
           id: doc.id || doc._id || slug,
           applicationId: doc.id || doc._id || slug,
@@ -217,6 +248,7 @@ export async function GET() {
           submittedAt: safeToIsoString(data.createdAt),
           round2Task: data.round2Task || null,
           round3Interview: data.round3Interview || null,
+          answers,
         });
       }
     });
@@ -238,9 +270,32 @@ export async function GET() {
           submittedAt: safeToIsoString(data.submittedAt || data.createdAt || existing.submittedAt),
           round2Task: data.round2Task || existing.round2Task || null,
           round3Interview: data.round3Interview || existing.round3Interview || null,
+          answers: existing.answers || [],
         });
       }
     });
+
+    // Ensure answers are populated: fallback to responses collection if missing from formData
+    for (const app of appMap.values()) {
+      if (!app.answers || app.answers.length === 0) {
+        try {
+          const respSnap = await db.collection("responses").where("applicationId", "==", app.applicationId).get();
+          const respDocs = respSnap?.docs || [];
+          if (respDocs.length > 0) {
+            app.answers = respDocs.map((rDoc) => {
+              const rData = typeof rDoc.data === "function" ? rDoc.data() : rDoc;
+              return {
+                key: rData.questionKey || rDoc.id,
+                question: rData.questionText || rData.questionKey || "Question",
+                answer: String(rData.answer ?? ""),
+              };
+            });
+          }
+        } catch (err) {
+          console.warn("Responses lookup notice for application:", app.applicationId, err?.message || err);
+        }
+      }
+    }
 
     // Normalize applications into 3-Round Progression Model
     const applications = Array.from(appMap.values()).map((app) => {
@@ -294,6 +349,7 @@ export async function GET() {
         submittedAt: app.submittedAt,
         status: app.status,
         currentRound,
+        answers: app.answers || [],
         rounds: {
           round1: {
             name: "ROUND 01",

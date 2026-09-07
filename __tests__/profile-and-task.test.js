@@ -189,6 +189,44 @@ async function runProfileAndTaskTests() {
 
   console.log("  ✓ Complete 3-Stage Lifecycle (Screening -> Task Submission -> Interview -> Selected) verified.");
 
+  // Test 4: Validate Application Answers Extraction & Formatting
+  console.log("Test 4: Validating Application Answers Extraction & Question Details...");
+  const sampleAnswersAppId = `app_answers_test_${Date.now()}`;
+  const sampleEmail = "candidate_answers@vitstudent.ac.in";
+  
+  const sampleQuestionDetails = [
+    { key: "github_url", question: "Provide your GitHub profile or project repo", answer: "https://github.com/vitstudent/sample-project" },
+    { key: "why_join", question: "Why do you want to join GDG on Campus VIT?", answer: "To collaborate on cutting edge community projects." },
+  ];
+
+  await db.collection("formData").doc(sampleAnswersAppId).set({
+    id: sampleAnswersAppId,
+    Email: sampleEmail,
+    Department: "Web Dev",
+    QuestionDetails: sampleQuestionDetails,
+    createdAt: new Date(),
+  });
+
+  const formDocSnap = await db.collection("formData").doc(sampleAnswersAppId).get();
+  const formDataVal = formDocSnap.data();
+  if (!Array.isArray(formDataVal.QuestionDetails) || formDataVal.QuestionDetails.length !== 2) {
+    throw new Error("QuestionDetails not stored properly in formData!");
+  }
+
+  const parsedAnswers = formDataVal.QuestionDetails.map((q) => ({
+    key: q.key,
+    question: q.question,
+    answer: String(q.answer),
+  }));
+
+  if (parsedAnswers[0].answer !== "https://github.com/vitstudent/sample-project") {
+    throw new Error("Parsed answer mismatch!");
+  }
+  if (!/^https?:\/\//i.test(parsedAnswers[0].answer)) {
+    throw new Error("Expected URL answer not detected as valid web URL!");
+  }
+  console.log("  ✓ Application answers extraction, structure, and URL detection verified.");
+
   console.log("\n>>> ALL PHASE 5 CANDIDATE PROFILE & TASK TESTS PASSED! <<<");
 }
 

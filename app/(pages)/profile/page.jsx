@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 import { PixelCard, PixelButton, PixelBadge } from "@/components/design-system";
 import DinoRankBadge from "@/components/profile/DinoRankBadge";
 import RoundProgressStepper from "@/components/profile/RoundProgressStepper";
+import ApplicationAnswersModal from "@/components/profile/ApplicationAnswersModal";
 import {
   Mail,
   Hash,
@@ -395,20 +396,30 @@ export default function ProfilePage() {
                         </p>
                       </div>
 
-                      <button
-                        onClick={() =>
-                          setExpandedApp(expandedApp === app.applicationId ? null : app.applicationId)
-                        }
-                        className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors cursor-pointer self-start sm:self-auto"
-                      >
-                        <Layers className="h-3.5 w-3.5" />
-                        <span>{expandedApp === app.applicationId ? "Hide Record" : "View Record"}</span>
-                        {expandedApp === app.applicationId ? (
-                          <ChevronUp className="h-3 w-3" />
-                        ) : (
-                          <ChevronDown className="h-3 w-3" />
-                        )}
-                      </button>
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
+                        <ApplicationAnswersModal
+                          departmentName={app.department}
+                          submittedAt={app.submittedAt}
+                          answers={app.answers || []}
+                          applicationId={app.applicationId}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedApp(expandedApp === app.applicationId ? null : app.applicationId)
+                          }
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-mono text-muted-foreground hover:text-foreground border border-transparent hover:border-border/60 transition-colors cursor-pointer"
+                        >
+                          <Layers className="h-3.5 w-3.5" />
+                          <span>{expandedApp === app.applicationId ? "Hide Info" : "Info"}</span>
+                          {expandedApp === app.applicationId ? (
+                            <ChevronUp className="h-3 w-3" />
+                          ) : (
+                            <ChevronDown className="h-3 w-3" />
+                          )}
+                        </button>
+                      </div>
                     </div>
 
                     {/* 3-Round Progress Stepper */}
@@ -423,7 +434,7 @@ export default function ProfilePage() {
 
                     {/* Expandable Submission Details */}
                     {expandedApp === app.applicationId && (
-                      <div className="pt-3 border-t border-border/30 font-mono text-xs bg-muted/20 p-3">
+                      <div className="pt-3 border-t border-border/30 font-mono text-xs bg-muted/20 p-3 space-y-2">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-muted-foreground text-[11px]">
                           <div>
                             <span className="text-muted-foreground/80">Application ID:</span>{" "}
@@ -433,6 +444,17 @@ export default function ProfilePage() {
                             <span className="text-muted-foreground/80">Candidate:</span>{" "}
                             <span className="text-foreground">{user.email}</span>
                           </div>
+                        </div>
+                        <div className="pt-2 border-t border-border/20 flex items-center justify-between">
+                          <span className="text-[11px] text-muted-foreground">
+                            Questionnaire responses: {app.answers?.length || 0} recorded
+                          </span>
+                          <ApplicationAnswersModal
+                            departmentName={app.department}
+                            submittedAt={app.submittedAt}
+                            answers={app.answers || []}
+                            applicationId={app.applicationId}
+                          />
                         </div>
                       </div>
                     )}
