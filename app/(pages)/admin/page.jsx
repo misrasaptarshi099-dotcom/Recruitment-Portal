@@ -16,7 +16,7 @@ export default async function AdminPage() {
     headers: await headers(),
   });
 
-  // Broken Access Control (OWASP A01) Guard: Require Authentication & Admin Role
+  // Broken Access Control (OWASP A01) Guard: Strictly Require Authentication
   if (!session?.user) {
     return (
       <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -45,6 +45,7 @@ export default async function AdminPage() {
     );
   }
 
+  // Broken Access Control (OWASP A01) Guard: Strictly Require Administrator Role
   if (!isUserAdmin(session.user)) {
     return (
       <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -76,12 +77,46 @@ export default async function AdminPage() {
   let applicants = [];
   try {
     const db = await connect();
-    const snapshot = await db.collection("formData").get();
-    applicants = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      _id: doc.id,
-      ...serializeFirestoreData(doc.data()),
-    }));
+    const [formSnap, appSnap] = await Promise.all([
+      db.collection("formData").get(),
+      db.collection("applications").get(),
+    ]);
+
+    const allIds = new Set();
+    const formMap = new Map();
+    (formSnap?.docs || []).forEach((doc) => {
+      const data = typeof doc.data === "function" ? doc.data() : doc;
+      formMap.set(doc.id, data);
+      allIds.add(doc.id);
+    });
+
+    const appMap = new Map();
+    (appSnap?.docs || []).forEach((doc) => {
+      const data = typeof doc.data === "function" ? doc.data() : doc;
+      appMap.set(doc.id, data);
+      allIds.add(doc.id);
+    });
+
+    applicants = Array.from(allIds).map((id) => {
+      const fData = formMap.get(id) || {};
+      const bData = appMap.get(id) || {};
+      const serialized = serializeFirestoreData(fData);
+      return {
+        id,
+        _id: id,
+        Name: fData.Name || bData.applicantName || "Candidate",
+        RegistrationNumber: fData.RegistrationNumber || bData.registrationNumber || "",
+        Email: fData.Email || bData.applicantEmail || "",
+        Department: fData.Department || bData.departmentName || bData.departmentId || "",
+        ...serialized,
+        shortlisted: Boolean(bData.shortlisted ?? fData.shortlisted ?? fData.Shortlisted),
+        Shortlisted: Boolean(bData.shortlisted ?? fData.shortlisted ?? fData.Shortlisted),
+        status: bData.status || fData.status || (fData.shortlisted ? "shortlisted" : "pending"),
+        round2Task: bData.round2Task || fData.round2Task || null,
+        round2Cleared: Boolean(bData.round2Cleared ?? fData.round2Cleared),
+        round3Interview: bData.round3Interview || fData.round3Interview || null,
+      };
+    });
   } catch (error) {
     console.error("Error loading applicants in admin portal:", error);
   }

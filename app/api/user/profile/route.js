@@ -297,6 +297,21 @@ export async function GET() {
       }
     }
 
+    // Fetch global/department recruitment deadlines from config
+    let recruitmentDeadlines = {
+      round1Deadline: null,
+      round2Deadline: null,
+      round2Deadlines: {},
+    };
+    try {
+      const dSnap = await db.collection("recruitment_config").doc("deadlines").get();
+      if (dSnap.exists) {
+        recruitmentDeadlines = { ...recruitmentDeadlines, ...dSnap.data() };
+      }
+    } catch (err) {
+      console.warn("Notice reading recruitment deadlines:", err?.message || err);
+    }
+
     // Normalize applications into 3-Round Progression Model
     const applications = Array.from(appMap.values()).map((app) => {
       const deptLower = (app.department || "").toLowerCase();
@@ -304,9 +319,16 @@ export async function GET() {
       const deptTone = departmentsData.find((d) => d.name.toLowerCase() === deptLower)?.tone || (isTech ? "#4285F4" : "#0F9D58");
       const defaultTask = DEFAULT_ROUND2_PROMPTS[deptLower] || DEFAULT_ROUND2_PROMPTS.default;
 
+      const isR2Cleared = Boolean(
+        app.round2Cleared ||
+        app.status === "round2_cleared" ||
+        app.status === "accepted" ||
+        app.round3Interview?.slotTime
+      );
+
       // --- Round 1: Screening & Portfolio Review ---
       let r1Status = "in_review";
-      if (app.shortlisted || app.status === "shortlisted") {
+      if (app.shortlisted || app.status === "shortlisted" || isR2Cleared) {
         r1Status = "cleared";
       } else if (app.status === "rejected") {
         r1Status = "rejected";
@@ -315,10 +337,10 @@ export async function GET() {
       // --- Round 2: Practical Domain Task ---
       let r2Status = "locked";
       if (r1Status === "cleared") {
-        if (app.round2Task?.submissionUrl) {
-          r2Status = "submitted";
-        } else if (app.status === "accepted" || app.round2Cleared) {
+        if (isR2Cleared) {
           r2Status = "cleared";
+        } else if (app.round2Task?.submissionUrl) {
+          r2Status = "submitted";
         } else {
           r2Status = "pending_submission";
         }
@@ -326,7 +348,7 @@ export async function GET() {
 
       // --- Round 3: Interview & Final Selection ---
       let r3Status = "locked";
-      if (r2Status === "cleared" || (r1Status === "cleared" && app.round3Interview?.slotTime)) {
+      if (isR2Cleared || (r1Status === "cleared" && app.round3Interview?.slotTime)) {
         if (app.status === "accepted") {
           r3Status = "accepted";
         } else if (app.status === "rejected") {
@@ -334,11 +356,17 @@ export async function GET() {
         } else if (app.round3Interview?.slotTime) {
           r3Status = "scheduled";
         } else {
-          r3Status = "in_review";
+          r3Status = "awaiting_schedule";
         }
       }
 
       const currentRound = r3Status !== "locked" ? 3 : r2Status !== "locked" ? 2 : 1;
+
+      const effectiveR2Deadline =
+        app.round2Task?.deadline ||
+        recruitmentDeadlines.round2Deadlines?.[app.departmentSlug] ||
+        recruitmentDeadlines.round2Deadline ||
+        defaultTask.deadline;
 
       return {
         applicationId: app.applicationId,
@@ -356,6 +384,7 @@ export async function GET() {
             title: "Application & Portfolio Screening",
             status: r1Status,
             description: "Initial evaluation of essay answers, previous projects, and candidate profile.",
+            deadline: recruitmentDeadlines.round1Deadline || null,
           },
           round2: {
             name: "ROUND 02",
@@ -363,7 +392,7 @@ export async function GET() {
             status: r2Status,
             description: defaultTask.description,
             taskPrompt: app.round2Task?.taskPrompt || defaultTask.title,
-            deadline: app.round2Task?.deadline || defaultTask.deadline,
+            deadline: effectiveR2Deadline,
             deliverableTypes: defaultTask.deliverableTypes,
             submissionUrl: app.round2Task?.submissionUrl || null,
             submittedAt: safeToIsoString(app.round2Task?.submittedAt),
@@ -373,10 +402,16 @@ export async function GET() {
             name: "ROUND 03",
             title: "Technical & Cultural Interview",
             status: r3Status,
-            description: "Live conversation with department leads and core committee.",
+            description: "Live 15-minute conversation with department leads and core committee.",
             slotTime: app.round3Interview?.slotTime || null,
+            date: app.round3Interview?.date || null,
+            startTime: app.round3Interview?.startTime || null,
+            endTime: app.round3Interview?.endTime || null,
             venue: app.round3Interview?.venue || null,
-            meetLink: app.round3Interview?.meetLink || null,
+            meetLink: app.round3Interview?.meetLink || app.round3Interview?.meetingLink || null,
+            meetingLink: app.round3Interview?.meetingLink || app.round3Interview?.meetLink || null,
+            slotId: app.round3Interview?.slotId || null,
+            bookedAt: safeToIsoString(app.round3Interview?.bookedAt),
           },
         },
       };

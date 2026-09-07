@@ -227,7 +227,167 @@ async function runProfileAndTaskTests() {
   }
   console.log("  ✓ Application answers extraction, structure, and URL detection verified.");
 
-  console.log("\n>>> ALL PHASE 5 CANDIDATE PROFILE & TASK TESTS PASSED! <<<");
+  // Test 5: Validate Round 2 Admin Clearance and Round 3 Interview Scheduling
+  console.log("Test 5: Validating Round 2 Clearance & Round 3 Interview Updates in DB...");
+  const r2TestAppId = `app_r2_admin_test_${Date.now()}`;
+  const r2TestEmail = "candidate_r2@vitstudent.ac.in";
+
+  await Promise.all([
+    db.collection("formData").doc(r2TestAppId).set({
+      id: r2TestAppId,
+      Email: r2TestEmail,
+      Department: "App Dev",
+      shortlisted: true,
+      round2Task: {
+        submissionUrl: "https://github.com/candidate/app-project",
+        submittedAt: new Date().toISOString(),
+        notes: "Flutter offline architecture",
+      },
+      createdAt: new Date(),
+    }),
+    db.collection("applications").doc(r2TestAppId).set({
+      applicationId: r2TestAppId,
+      candidateEmail: r2TestEmail,
+      department: "App Dev",
+      shortlisted: true,
+      status: "shortlisted",
+      round2Task: {
+        submissionUrl: "https://github.com/candidate/app-project",
+        submittedAt: new Date().toISOString(),
+        notes: "Flutter offline architecture",
+      },
+    }),
+  ]);
+
+  // Admin Clears Round 2
+  await Promise.all([
+    db.collection("formData").doc(r2TestAppId).update({
+      round2Cleared: true,
+      status: "round2_cleared",
+    }),
+    db.collection("applications").doc(r2TestAppId).update({
+      round2Cleared: true,
+      status: "round2_cleared",
+    }),
+  ]);
+
+  const snapCleared = await db.collection("formData").doc(r2TestAppId).get();
+  if (!snapCleared.data().round2Cleared || snapCleared.data().status !== "round2_cleared") {
+    throw new Error("Round 2 clearance failed to persist!");
+  }
+
+  // Admin Schedules Round 3 Interview
+  const interviewSlot = {
+    slotTime: "Tomorrow, 4:00 PM IST",
+    venue: "Technology Tower TT-314",
+    meetLink: "https://meet.google.com/gdg-live-slot",
+  };
+
+  await Promise.all([
+    db.collection("formData").doc(r2TestAppId).update({
+      round3Interview: interviewSlot,
+      status: "scheduled",
+    }),
+    db.collection("applications").doc(r2TestAppId).update({
+      round3Interview: interviewSlot,
+      status: "scheduled",
+    }),
+  ]);
+
+  const snapScheduled = await db.collection("formData").doc(r2TestAppId).get();
+  if (snapScheduled.data().round3Interview?.slotTime !== interviewSlot.slotTime || snapScheduled.data().status !== "scheduled") {
+    throw new Error("Round 3 interview schedule failed to persist!");
+  }
+
+  // Admin Accepts Candidate
+  await Promise.all([
+    db.collection("formData").doc(r2TestAppId).update({ status: "accepted" }),
+    db.collection("applications").doc(r2TestAppId).update({ status: "accepted" }),
+  ]);
+
+  const snapAccepted = await db.collection("formData").doc(r2TestAppId).get();
+  if (snapAccepted.data().status !== "accepted") {
+    throw new Error("Final acceptance status update failed!");
+  }
+
+  console.log("  ✓ Round 2 evaluation & Round 3 interview lifecycle updates verified.");
+
+  // Test 6: Round 1 & Round 2 Deadline Persistence
+  console.log("Test 6: Validating Round 1 & Round 2 Deadline Configuration...");
+  const deadlinePayload = {
+    round1Deadline: "2026-09-15T23:59:00.000Z",
+    round2Deadline: "2026-09-20T23:59:00.000Z",
+    updatedAt: new Date().toISOString(),
+  };
+  await db.collection("recruitment_config").doc("deadlines").set(deadlinePayload);
+  const snapDeadlines = await db.collection("recruitment_config").doc("deadlines").get();
+  if (snapDeadlines.data().round1Deadline !== deadlinePayload.round1Deadline) {
+    throw new Error("Round 1 deadline configuration failed to persist!");
+  }
+  console.log("  ✓ Round 1 & Round 2 deadline configuration verified.");
+
+  // Test 7: 15-Minute Cumulative Slot Generation Math
+  console.log("Test 7: Validating 15-Minute Cumulative Slot Generator...");
+  const startTime = "14:00";
+  const endTime = "17:00"; // 3 hours = 180 mins = 12 slots of 15 mins
+  const [sH, sM] = startTime.split(":").map(Number);
+  const [eH, eM] = endTime.split(":").map(Number);
+  const startMins = sH * 60 + sM;
+  const endMins = eH * 60 + eM;
+  const generatedSlots = [];
+
+  for (let cur = startMins; cur + 15 <= endMins; cur += 15) {
+    const sStr = `${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`;
+    const eStr = `${String(Math.floor((cur + 15) / 60)).padStart(2, "0")}:${String((cur + 15) % 60).padStart(2, "0")}`;
+    generatedSlots.push({ start: sStr, end: eStr, duration: 15 });
+  }
+
+  if (generatedSlots.length !== 12) {
+    throw new Error(`Expected 12 slots for 14:00 to 17:00, got ${generatedSlots.length}`);
+  }
+  if (generatedSlots[0].start !== "14:00" || generatedSlots[0].end !== "14:15") {
+    throw new Error(`First slot invalid: ${JSON.stringify(generatedSlots[0])}`);
+  }
+  if (generatedSlots[11].start !== "16:45" || generatedSlots[11].end !== "17:00") {
+    throw new Error(`Last slot invalid: ${JSON.stringify(generatedSlots[11])}`);
+  }
+  console.log("  ✓ 15-Minute cumulative slot generator math verified (12 contiguous slots).");
+
+  // Test 8: Student 15-Minute Slot Reservation & Meeting Link
+  console.log("Test 8: Validating Student 15-Minute Slot Reservation & Meeting Link...");
+  const testSlotId = `slot_web_dev_20260912_1415`;
+  const slotDoc = {
+    slotId: testSlotId,
+    department: "Web Dev",
+    departmentSlug: "web_dev",
+    date: "2026-09-12",
+    startTime: "14:15",
+    endTime: "14:30",
+    slotLabel: "02:15 PM - 02:30 PM",
+    meetingLink: "https://meet.google.com/gdg-web-interview",
+    status: "available",
+  };
+  await db.collection("interview_slots").doc(testSlotId).set(slotDoc);
+
+  // Reserve slot atomically
+  await db.runTransaction(async (t) => {
+    const slotRef = db.collection("interview_slots").doc(testSlotId);
+    const snap = await t.get(slotRef);
+    if (snap.data().status !== "available") throw new Error("Slot already taken!");
+    t.update(slotRef, {
+      status: "booked",
+      bookedBy: r2TestEmail,
+      applicationId: r2TestAppId,
+    });
+  });
+
+  const snapBooked = await db.collection("interview_slots").doc(testSlotId).get();
+  if (snapBooked.data().status !== "booked" || snapBooked.data().bookedBy !== r2TestEmail) {
+    throw new Error("Interview slot booking transaction failed!");
+  }
+  console.log("  ✓ Student 15-minute slot reservation verified (booked with meeting link).");
+
+  console.log("\n>>> ALL PHASE 5 & 6 INTERVIEW SLOTS, DEADLINES & TASK TESTS PASSED! <<<");
 }
 
 runProfileAndTaskTests().catch((err) => {

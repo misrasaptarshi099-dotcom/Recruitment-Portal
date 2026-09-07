@@ -8,6 +8,7 @@ import { PixelCard, PixelButton, PixelBadge } from "@/components/design-system";
 import DinoRankBadge from "@/components/profile/DinoRankBadge";
 import RoundProgressStepper from "@/components/profile/RoundProgressStepper";
 import ApplicationAnswersModal from "@/components/profile/ApplicationAnswersModal";
+import DinoRunningLoader from "@/components/profile/DinoRunningLoader";
 import {
   Mail,
   Hash,
@@ -22,21 +23,60 @@ import {
   RefreshCw,
 } from "lucide-react";
 
+let cachedProfileInMemory = null;
+
+function getCachedProfile() {
+  if (cachedProfileInMemory) return cachedProfileInMemory;
+  if (typeof window !== "undefined") {
+    try {
+      const raw = sessionStorage.getItem("gdg_profile_cache");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        cachedProfileInMemory = parsed;
+        return parsed;
+      }
+    } catch {}
+  }
+  return null;
+}
+
 export default function ProfilePage() {
   const { data: session, isPending: sessionLoading } = authClient.useSession();
+  const [mounted, setMounted] = useState(false);
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedApp, setExpandedApp] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [readyToDisplay, setReadyToDisplay] = useState(false);
+  const hasLoadedRef = React.useRef(false);
 
-  const fetchProfile = useCallback(async () => {
+  // Hydration sync: safely hydrate client cache after mount
+  useEffect(() => {
+    setMounted(true);
+    const cached = getCachedProfile();
+    if (cached) {
+      setProfileData(cached);
+      hasLoadedRef.current = true;
+    }
+  }, []);
+
+  const userEmail = session?.user?.email;
+
+  const fetchProfile = useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent && !hasLoadedRef.current) {
+        setLoading(true);
+      }
       setError(null);
       const res = await fetch("/api/user/profile");
       if (!res.ok) {
         if (res.status === 401) {
           setProfileData(null);
+          cachedProfileInMemory = null;
+          if (typeof window !== "undefined") {
+            try { sessionStorage.removeItem("gdg_profile_cache"); } catch {}
+          }
           return;
         }
         const errJson = await res.json().catch(() => ({}));
@@ -44,9 +84,16 @@ export default function ProfilePage() {
       }
       const data = await res.json();
       setProfileData(data);
+      hasLoadedRef.current = true;
+      cachedProfileInMemory = data;
+      if (typeof window !== "undefined") {
+        try { sessionStorage.setItem("gdg_profile_cache", JSON.stringify(data)); } catch {}
+      }
     } catch (err) {
       console.error("Profile fetch error:", err);
-      setError(err.message);
+      if (!hasLoadedRef.current) {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -54,18 +101,62 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!sessionLoading) {
-      if (session?.user) {
-        fetchProfile();
+      if (userEmail) {
+        const isSilent = hasLoadedRef.current;
+        fetchProfile(isSilent);
       } else {
         setLoading(false);
+        setReadyToDisplay(true);
       }
     }
-  }, [sessionLoading, session, fetchProfile]);
+  }, [sessionLoading, userEmail, fetchProfile]);
+
+  // Running Dino Telemetry progress loop (0% to 100%) - only runs on first cold load
+  useEffect(() => {
+    if (!mounted || readyToDisplay) return;
+
+    if (!sessionLoading && !userEmail) {
+      setReadyToDisplay(true);
+      return;
+    }
+
+    let interval = null;
+    let finishTimeout = null;
+
+    interval = setInterval(() => {
+      setProgress((prev) => {
+        // If profileData is loaded, accelerate towards 100%
+        if (profileData) {
+          const next = prev + 10;
+          if (next >= 100) {
+            clearInterval(interval);
+            finishTimeout = setTimeout(() => {
+              setReadyToDisplay(true);
+            }, 180);
+            return 100;
+          }
+          return next;
+        }
+
+        // While waiting for API, smoothly climb up to ~85%
+        if (prev < 85) {
+          const step = Math.max(1, (85 - prev) * 0.14);
+          return Math.min(prev + step, 85);
+        }
+        return prev;
+      });
+    }, 45);
+
+    return () => {
+      if (interval) clearInterval(interval);
+      if (finishTimeout) clearTimeout(finishTimeout);
+    };
+  }, [mounted, sessionLoading, userEmail, profileData, readyToDisplay]);
 
   const handleTaskSubmitted = (applicationId, newRound2Task) => {
     setProfileData((prev) => {
       if (!prev) return prev;
-      return {
+      const updated = {
         ...prev,
         applications: prev.applications.map((app) => {
           if (app.applicationId === applicationId) {
@@ -86,38 +177,82 @@ export default function ProfilePage() {
           return app;
         }),
       };
+      cachedProfileInMemory = updated;
+      if (typeof window !== "undefined") {
+        try { sessionStorage.setItem("gdg_profile_cache", JSON.stringify(updated)); } catch {}
+      }
+      return updated;
     });
   };
 
-  // --- Loading Skeleton ---
-  if (sessionLoading || (loading && !profileData && !session?.user)) {
+  const handleSlotBooked = (applicationId, slotDetails) => {
+    setProfileData((prev) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        applications: prev.applications.map((app) => {
+          if (app.applicationId === applicationId) {
+            return {
+              ...app,
+              status: app.status === "accepted" ? "accepted" : "round3_scheduled",
+              rounds: {
+                ...app.rounds,
+                round3: {
+                  ...app.rounds.round3,
+                  status: "scheduled",
+                  slotTime: slotDetails.slotTime,
+                  date: slotDetails.date,
+                  startTime: slotDetails.startTime,
+                  endTime: slotDetails.endTime,
+                  meetingLink: slotDetails.meetingLink || slotDetails.meetLink,
+                  meetLink: slotDetails.meetingLink || slotDetails.meetLink,
+                  venue: slotDetails.venue,
+                  slotId: slotDetails.slotId,
+                  bookedAt: slotDetails.bookedAt,
+                },
+              },
+            };
+          }
+          return app;
+        }),
+      };
+      cachedProfileInMemory = updated;
+      if (typeof window !== "undefined") {
+        try { sessionStorage.setItem("gdg_profile_cache", JSON.stringify(updated)); } catch {}
+      }
+      return updated;
+    });
+  };
+
+  // --- 1. Hydration Guard: Render identical loader on SSR and first client hydration pass ---
+  if (!mounted) {
     return (
-      <div className="min-h-screen bg-background py-16 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="inline-block p-4 border-2 border-emerald-500/60 bg-zinc-950 shadow-[4px_4px_0px_#10B981]">
-            <pre className="font-mono text-emerald-400 text-xs leading-none select-none">
-{`    ███████
-   ███  ████
-   █████████
-   ████
-  ███████
- █  ███  █
-    █ █   `}
-            </pre>
-          </div>
-          <div className="font-pixel text-xs text-emerald-500 uppercase tracking-widest animate-pulse">
-            [MAINFRAME // ACCESSING_CANDIDATE_DATA]
-          </div>
-          <p className="font-mono text-xs text-muted-foreground">
-            Synchronizing BCNF records and arcade telemetry...
-          </p>
-        </div>
-      </div>
+      <DinoRunningLoader
+        progress={0}
+        statusMessage="Synchronizing candidate application dossier and arcade telemetry..."
+      />
     );
   }
 
-  // --- Unauthenticated State ---
-  if (!session?.user) {
+  // --- 2. Animated Running Dino Loading Screen (0% -> 100%) ---
+  // Only shows on initial cold load before data is available
+  if (!readyToDisplay) {
+    if (!sessionLoading && !session?.user) {
+      // Proceed to unauthenticated screen below
+    } else if (error && !profileData) {
+      // Proceed to error screen below
+    } else {
+      return (
+        <DinoRunningLoader
+          progress={progress}
+          statusMessage="Synchronizing candidate application dossier and arcade telemetry..."
+        />
+      );
+    }
+  }
+
+  // --- 3. Unauthenticated State (only when session resolution is complete and user is absent) ---
+  if (!sessionLoading && !session?.user) {
     return (
       <div className="min-h-screen bg-background py-16 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
         <PixelCard variant="arcade" scanline={true} className="max-w-md w-full text-center p-6 sm:p-8">
@@ -146,6 +281,48 @@ export default function ProfilePage() {
           </div>
         </PixelCard>
       </div>
+    );
+  }
+
+  // --- 4. Sync Error State ---
+  if (error && !profileData) {
+    return (
+      <div className="min-h-screen bg-background py-16 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+        <PixelCard variant="arcade" scanline={true} className="max-w-md w-full text-center p-6 sm:p-8">
+          <div className="space-y-4">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center border-2 border-destructive/50 bg-zinc-900 text-2xl shadow-[2px_2px_0px_#EF4444]">
+              <span role="img" aria-label="error">⚠️</span>
+            </div>
+            <div>
+              <span className="font-pixel text-[10px] text-destructive uppercase tracking-wider block">
+                TERMINAL // SYNC_ERROR
+              </span>
+              <h2 className="font-sans font-bold text-xl text-foreground mt-1">
+                Unable to Load Telemetry
+              </h2>
+            </div>
+            <p className="font-mono text-xs text-muted-foreground leading-relaxed">
+              {error || "An error occurred while synchronizing candidate applications."}
+            </p>
+            <div className="pt-2">
+              <PixelButton onClick={() => fetchProfile()} variant="arcade" className="w-full">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                RETRY SYNCHRONIZATION
+              </PixelButton>
+            </div>
+          </div>
+        </PixelCard>
+      </div>
+    );
+  }
+
+  // --- 5. Data Guard: Dossier values must be available before displaying profile ---
+  if (!profileData) {
+    return (
+      <DinoRunningLoader
+        progress={progress}
+        statusMessage="Synchronizing candidate application dossier and arcade telemetry..."
+      />
     );
   }
 
@@ -429,6 +606,9 @@ export default function ProfilePage() {
                       rounds={app.rounds}
                       onTaskSubmitted={(newTask) =>
                         handleTaskSubmitted(app.applicationId, newTask)
+                      }
+                      onSlotBooked={(appId, slotDetails) =>
+                        handleSlotBooked(appId, slotDetails)
                       }
                     />
 
