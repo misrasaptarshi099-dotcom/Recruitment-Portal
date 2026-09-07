@@ -11,6 +11,8 @@ import { authClient } from "@/lib/auth-client";
 import { isUserAdmin } from "@/lib/security";
 import { Loader2 } from "lucide-react";
 
+import CardNav from "./CardNav";
+
 export default function NavBar() {
   const pathname = usePathname();
   const { data: session, isPending } = authClient.useSession();
@@ -24,9 +26,84 @@ export default function NavBar() {
     ...(isAdmin ? [{ label: "Admin Panel", href: "/admin" }] : []),
   ];
 
+  const cardNavItems = [
+    {
+      label: "Departments",
+      bgColor: "hsl(var(--card))",
+      textColor: "hsl(var(--foreground))",
+      links: [
+        { label: "Explore All Trees", href: "/departments" },
+        { label: "Technical Tracks", href: "/departments" },
+        { label: "Creative & Management", href: "/departments" },
+      ],
+    },
+    {
+      label: "Candidate Area",
+      bgColor: "hsl(var(--card))",
+      textColor: "hsl(var(--foreground))",
+      links: [
+        ...(isAuthenticated ? [{ label: "My Profile & Status", href: "/profile" }] : [{ label: "Sign In With University Email", href: "/auth/signin" }]),
+        { label: "Dino Arcade & Leaderboard", href: "/" },
+      ],
+    },
+    ...(isAdmin
+      ? [
+          {
+            label: "Admin Controls",
+            bgColor: "hsl(var(--card))",
+            textColor: "hsl(var(--foreground))",
+            links: [
+              { label: "Applicant Review Dashboard", href: "/admin" },
+              { label: "Shortlisting & Department Evaluation", href: "/admin" },
+            ],
+          },
+        ]
+      : []),
+  ];
+
   return (
     <header className="sticky top-0 z-50 w-full border-b-2 border-border/80 bg-background/90 backdrop-blur-lg transition-colors">
-      <div className="w-full max-w-[1536px] mx-auto flex h-16 items-center justify-between px-4 sm:px-8 lg:px-12 xl:px-16">
+      {/* Mobile CardNav View */}
+      <div className="md:hidden px-3 py-2 w-full">
+        <CardNav
+          logo={
+            <Link href="/" className="flex items-center gap-2">
+              <div className="relative h-7 w-7 overflow-hidden border border-border bg-card p-1 shadow-pixel-sm">
+                <Image
+                  src="/assets/gdg.svg"
+                  alt="GDG Logo"
+                  width={20}
+                  height={20}
+                  className="h-full w-full"
+                />
+              </div>
+            </Link>
+          }
+          brandTitle="GDG on Campus"
+          items={cardNavItems}
+          ctaButton={
+            <div className="flex items-center gap-1.5">
+              <ThemeToggle />
+              {isPending ? (
+                <div className="flex h-7 w-7 items-center justify-center">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                </div>
+              ) : isAuthenticated ? (
+                <UserButton user={user} />
+              ) : (
+                <Link href="/auth/signin">
+                  <PixelButton variant="arcade" size="sm" className="h-8 px-2 text-xs">
+                    Sign In
+                  </PixelButton>
+                </Link>
+              )}
+            </div>
+          }
+        />
+      </div>
+
+      {/* Desktop Navigation Bar */}
+      <div className="hidden md:flex w-full max-w-[1536px] mx-auto h-16 items-center justify-between px-4 sm:px-8 lg:px-12 xl:px-16">
         {/* Brand */}
         <Link href="/" className="flex items-center gap-3 transition-opacity hover:opacity-90">
           <div className="relative h-9 w-9 overflow-hidden border-2 border-border bg-card p-1 shadow-pixel-sm">
