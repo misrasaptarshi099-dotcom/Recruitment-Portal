@@ -518,7 +518,24 @@ async function runProfileAndTaskTests() {
 
   // Test 10: Validate Central Email Notification Engine & Templates
   console.log("Test 10: Validating Central Mailer Engine, Templates & Dispatch Handlers...");
-  const { verifySmtpConnection, sendDecisionEmail, sendInterviewConfirmationEmail, sendBatchAnnouncementEmail } = await import("../lib/mailer.js");
+  let mailerMod;
+  try {
+    mailerMod = typeof require !== "undefined" ? require("../lib/mailer") : null;
+  } catch {}
+  if (!mailerMod || typeof mailerMod.verifySmtpConnection !== "function") {
+    try {
+      const mailEsm = await import("../lib/mailer.js");
+      mailerMod = mailEsm.verifySmtpConnection ? mailEsm : (mailEsm.default || mailEsm);
+    } catch {}
+  }
+  const verifySmtpConnection = mailerMod?.verifySmtpConnection || mailerMod?.default?.verifySmtpConnection;
+  const sendDecisionEmail = mailerMod?.sendDecisionEmail || mailerMod?.default?.sendDecisionEmail;
+  const sendInterviewConfirmationEmail = mailerMod?.sendInterviewConfirmationEmail || mailerMod?.default?.sendInterviewConfirmationEmail;
+  const sendBatchAnnouncementEmail = mailerMod?.sendBatchAnnouncementEmail || mailerMod?.default?.sendBatchAnnouncementEmail;
+
+  if (typeof verifySmtpConnection !== "function") {
+    throw new Error("verifySmtpConnection could not be resolved from mailer module!");
+  }
 
   const smtpCheck = await verifySmtpConnection();
   if (typeof smtpCheck.configured !== "boolean") {
