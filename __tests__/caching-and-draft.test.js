@@ -123,7 +123,25 @@ async function runCachingAndDraftTests() {
 
   // Test 6: Concurrent Dino Score Atomic Transactions
   console.log("Test 6: Validating concurrent dino-score transactions & high-score retention...");
-  const { connect } = await import("../lib/db.ts");
+  let connect;
+  try {
+    const dbMod = await import("../lib/db.ts");
+    connect = dbMod.connect || dbMod.default?.connect;
+  } catch {
+    // fallback
+  }
+  if (typeof connect !== "function" && typeof require !== "undefined") {
+    try {
+      const dbCjs = require("../lib/db");
+      connect = dbCjs.connect || dbCjs.default?.connect;
+    } catch {
+      // ignore
+    }
+  }
+  if (typeof connect !== "function") {
+    const dbMod = await import("../lib/db");
+    connect = dbMod.connect || dbMod.default?.connect;
+  }
   const db = await connect();
   const testDinoUser = `dino_concurrency_${Date.now()}`;
   const scoreRef = db.collection("dinoScores").doc(testDinoUser);
