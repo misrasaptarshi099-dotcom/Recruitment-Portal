@@ -34,7 +34,7 @@ function playArcadeBeep() {
 
 const variants = {
   primary:
-    "bg-foreground text-background border-2 border-foreground hover:bg-foreground/90 shadow-[3px_3px_0px_#202124] dark:shadow-[3px_3px_0px_#FFFFFF]",
+    "bg-foreground text-background border-2 border-foreground hover:bg-foreground/90 shadow-[2px_2px_0px_#202124] dark:shadow-[2px_2px_0px_rgba(255,255,255,0.25)]",
   technical:
     "bg-blue-600 text-white border-2 border-blue-500 hover:bg-blue-500 shadow-[3px_3px_0px_#1D4ED8] dark:shadow-[3px_3px_0px_#93C5FD]",
   creative:
@@ -46,7 +46,7 @@ const variants = {
   destructive:
     "bg-rose-600 text-white border-2 border-rose-500 hover:bg-rose-500 shadow-[3px_3px_0px_#BE123C]",
   outline:
-    "bg-background text-foreground border-2 border-border hover:bg-muted/60 shadow-[3px_3px_0px_currentColor]",
+    "bg-background text-foreground border-2 border-border hover:bg-muted/60 hover:border-foreground/40 shadow-[2px_2px_0px_rgba(0,0,0,0.4)] dark:shadow-[2px_2px_0px_rgba(255,255,255,0.15)]",
   ghost:
     "bg-transparent text-foreground hover:bg-muted/60 shadow-none border-transparent",
 };

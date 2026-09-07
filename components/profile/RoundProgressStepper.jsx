@@ -73,18 +73,26 @@ export default function RoundProgressStepper({
         const cfg = statusConfigs[round.status] || statusConfigs.locked;
         const Icon = cfg.icon;
         const isLocked = round.status === "locked";
-        const isActive = round.status === "in_review" || round.status === "pending_submission" || round.status === "scheduled";
         const isActionRequired = round.status === "pending_submission";
+        const isSubmitted = round.status === "submitted";
+        const isCleared = round.status === "cleared" || round.status === "accepted";
+        const isScheduled = round.status === "scheduled";
 
         return (
           <div
             key={round.key}
             className={cn(
-              "p-4 border transition-all duration-200 bg-background/50 flex flex-col justify-between min-h-[96px]",
-              isActive
-                ? "border-emerald-500/60 bg-card/80 shadow-[2px_2px_0px_#10B981]"
+              "p-3.5 sm:p-4 border transition-all duration-200 bg-background/50 flex flex-col justify-between min-h-[105px]",
+              isActionRequired
+                ? "border-emerald-500/80 bg-emerald-500/5 shadow-[2px_2px_0px_#10B981]"
+                : isSubmitted
+                ? "border-blue-500/50 bg-blue-500/5 shadow-[2px_2px_0px_rgba(59,130,246,0.25)]"
+                : isScheduled
+                ? "border-cyan-500/50 bg-cyan-500/5 shadow-[2px_2px_0px_rgba(6,182,212,0.25)]"
+                : isCleared
+                ? "border-emerald-500/40 bg-emerald-500/5"
                 : isLocked
-                ? "border-border/40 opacity-50"
+                ? "border-border/40 bg-muted/10 opacity-50"
                 : "border-border/70 bg-card/40"
             )}
           >
@@ -137,16 +145,20 @@ export default function RoundProgressStepper({
                   )}
 
                   {round.status === "submitted" && (
-                    <div className="flex items-center justify-between gap-2 mt-1">
-                      <a
-                        href={round.submissionUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:underline inline-flex items-center gap-1 text-[11px] truncate max-w-[120px]"
-                      >
-                        <ExternalLink className="h-3 w-3 shrink-0" />
-                        <span>View Link</span>
-                      </a>
+                    <div className="space-y-2 mt-1">
+                      <div className="flex items-center justify-between gap-2 border border-border/70 bg-muted/20 px-2.5 py-1.5 text-xs font-mono">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">LINK:</span>
+                        <a
+                          href={round.submissionUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:text-blue-300 hover:underline inline-flex items-center gap-1 text-[11px] font-medium truncate max-w-[170px]"
+                          title={round.submissionUrl}
+                        >
+                          <span className="truncate">{round.submissionUrl.replace(/^https?:\/\/(www\.)?/, "")}</span>
+                          <ExternalLink className="h-3 w-3 shrink-0" />
+                        </a>
+                      </div>
                       <TaskSubmissionDrawer
                         applicationId={applicationId}
                         departmentName={departmentName}

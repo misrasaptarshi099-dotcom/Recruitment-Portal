@@ -39,7 +39,7 @@ export default function DinoRankBadge({
   return (
     <div
       className={cn(
-        "relative p-5 border-2 border-border/80 bg-card/95 shadow-[4px_4px_0px_#10B981] dark:bg-zinc-950 flex flex-col justify-between overflow-hidden",
+        "relative p-5 border border-border/80 bg-card/95 shadow-[2px_2px_0px_#10B981] dark:bg-zinc-950 flex flex-col justify-between overflow-hidden",
         className
       )}
     >

@@ -230,13 +230,13 @@ export default function ProfilePage() {
         {/* User Identity HUD Card */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
           {/* Left 2 Cols: Identity Info */}
-          <div className="lg:col-span-2 border-2 border-border/80 bg-card p-5 sm:p-6 shadow-[4px_4px_0px_#4285F4] dark:bg-zinc-950 relative overflow-hidden flex flex-col justify-between">
+          <div className="lg:col-span-2 border border-border/80 bg-card p-5 sm:p-6 shadow-[2px_2px_0px_#4285F4] dark:bg-zinc-950 relative overflow-hidden flex flex-col justify-between">
             <div className="scanline-overlay pointer-events-none absolute inset-0 z-10 opacity-20" />
 
             <div className="relative z-20 space-y-5">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5">
                 {/* Avatar Box */}
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center border-2 border-border bg-muted/60 text-foreground font-pixel text-xl shadow-[2px_2px_0px_currentColor] overflow-hidden">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center border border-border bg-muted/60 text-foreground font-pixel text-xl shadow-[2px_2px_0px_rgba(0,0,0,0.3)] overflow-hidden">
                   {user.avatar ? (
                     <Image
                       src={user.avatar}
@@ -486,7 +486,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Bottom Arcade Leaderboard Banner */}
-        <div className="border-2 border-border/80 bg-card p-5 shadow-[4px_4px_0px_#10B981] dark:bg-zinc-950 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="border border-border/80 bg-card p-5 shadow-[2px_2px_0px_#10B981] dark:bg-zinc-950 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3 text-left">
             <div className="h-10 w-10 flex items-center justify-center border border-emerald-500/40 bg-zinc-900 text-xl shadow-[2px_2px_0px_#10B981] shrink-0">
               🦖

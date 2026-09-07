@@ -74,28 +74,28 @@ export default function TaskSubmissionDrawer({
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <PixelButton
-          variant={isAlreadySubmitted ? "outline" : "arcade"}
-          size="sm"
-          className="font-pixel text-[10px] tracking-wide"
-        >
-          {isAlreadySubmitted ? (
-            <>
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-              VIEW / UPDATE DELIVERABLE
-            </>
-          ) : (
-            <>
-              <Send className="h-3.5 w-3.5" />
-              SUBMIT TASK DELIVERABLE
-            </>
-          )}
-        </PixelButton>
+        {isAlreadySubmitted ? (
+          <button
+            type="button"
+            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold border border-border/80 bg-muted/30 hover:bg-muted/70 hover:border-emerald-500/60 text-foreground transition-all duration-150 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,0.3)]"
+          >
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+            <span>Update Submission</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-mono font-bold border-2 border-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-all duration-150 cursor-pointer shadow-[2px_2px_0px_#10B981]"
+          >
+            <Send className="h-3.5 w-3.5 shrink-0" />
+            <span>Submit Task Deliverable</span>
+          </button>
+        )}
       </Dialog.Trigger>
 
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs transition-opacity data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%] border-2 border-border bg-card p-6 shadow-[6px_6px_0px_#10B981] dark:bg-zinc-950 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] focus:outline-hidden">
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm transition-opacity data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%] border-2 border-border bg-card p-6 shadow-[6px_6px_0px_#10B981] dark:bg-zinc-950 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] focus:outline-none">
           {/* CRT Scanline */}
           <div className="scanline-overlay pointer-events-none absolute inset-0 z-10 opacity-25" />
 
@@ -168,7 +168,7 @@ export default function TaskSubmissionDrawer({
                     placeholder="https://github.com/username/project or https://figma.com/file/..."
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    className="w-full rounded-none border-2 border-border/80 bg-background/90 py-2 pl-9 pr-3 text-xs font-mono text-foreground placeholder:text-muted-foreground/60 focus:border-emerald-500 focus:outline-hidden"
+                    className="w-full rounded-none border-2 border-border/80 bg-background/90 py-2 pl-9 pr-3 text-xs font-mono text-foreground placeholder:text-muted-foreground/60 focus:border-emerald-500 focus:outline-none"
                   />
                 </div>
                 <p className="mt-1 text-[10px] font-mono text-muted-foreground">
@@ -186,7 +186,7 @@ export default function TaskSubmissionDrawer({
                   placeholder="Briefly describe your stack, setup instructions, or key design decisions..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full rounded-none border-2 border-border/80 bg-background/90 p-2.5 text-xs font-mono text-foreground placeholder:text-muted-foreground/60 focus:border-emerald-500 focus:outline-hidden resize-none"
+                  className="w-full rounded-none border-2 border-border/80 bg-background/90 p-2.5 text-xs font-mono text-foreground placeholder:text-muted-foreground/60 focus:border-emerald-500 focus:outline-none resize-none"
                 />
               </div>
 
@@ -198,16 +198,19 @@ export default function TaskSubmissionDrawer({
 
               <div className="flex items-center justify-end gap-3 pt-2">
                 <Dialog.Close asChild>
-                  <PixelButton type="button" variant="outline" size="sm" className="font-mono text-xs">
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center px-4 py-1.5 text-xs font-mono font-semibold border border-border/80 bg-muted/40 hover:bg-muted/80 text-foreground transition-colors cursor-pointer"
+                  >
                     CANCEL
-                  </PixelButton>
+                  </button>
                 </Dialog.Close>
                 <PixelButton
                   type="submit"
                   variant="arcade"
                   size="sm"
                   disabled={loading}
-                  className="font-pixel text-[10px]"
+                  className="font-mono text-xs font-bold"
                 >
                   {loading ? "TRANSMITTING..." : isAlreadySubmitted ? "UPDATE SUBMISSION" : "CONFIRM SUBMISSION"}
                 </PixelButton>
