@@ -17,10 +17,19 @@ if (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
 
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID;
 const FIREBASE_CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL;
-const FIREBASE_PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY?.replace(
-  /\\n/g,
-  "\n",
-);
+const formatPrivateKey = (key?: string) => {
+  if (!key) return undefined;
+  let formatted = key.trim();
+  while (
+    (formatted.startsWith('"') && formatted.endsWith('"')) ||
+    (formatted.startsWith("'") && formatted.endsWith("'"))
+  ) {
+    formatted = formatted.slice(1, -1).trim();
+  }
+  return formatted.replace(/\\n/g, "\n").replace(/\r\n/g, "\n");
+};
+
+const FIREBASE_PRIVATE_KEY = formatPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
 const GOOGLE_APPLICATION_CREDENTIALS = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 const hasServiceAccount = Boolean(
@@ -190,11 +199,15 @@ export const connect = async (): Promise<any> => {
   if (hasGoogleCreds) {
     const appOptions: any = { projectId: FIREBASE_PROJECT_ID };
     if (FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
-      appOptions.credential = cert({
-        projectId: FIREBASE_PROJECT_ID,
-        clientEmail: FIREBASE_CLIENT_EMAIL,
-        privateKey: FIREBASE_PRIVATE_KEY,
-      });
+      try {
+        appOptions.credential = cert({
+          projectId: FIREBASE_PROJECT_ID,
+          clientEmail: FIREBASE_CLIENT_EMAIL,
+          privateKey: FIREBASE_PRIVATE_KEY,
+        });
+      } catch (err: any) {
+        console.warn("[DB] Failed to initialize Firebase credential with cert():", err?.message);
+      }
     }
 
     const DB_APP_NAME = "data-db";
