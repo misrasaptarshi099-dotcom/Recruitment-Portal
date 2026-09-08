@@ -78,13 +78,13 @@ async function runUpstashRateLimitTest() {
   // 4. Verify Key Persistence and TTL directly inside Upstash Redis
   console.log("\n[4] Inspecting Key Directly in Upstash Redis...");
   const rawKey = `rl:${testId}`;
-  const [val, ttl] = await Promise.all([
-    redis.get<number>(rawKey),
+  const [card, ttl] = await Promise.all([
+    redis.eval<number>("return redis.call('ZCARD', KEYS[1])", [rawKey]),
     redis.ttl(rawKey)
   ]);
-  console.log(`    Key "${rawKey}" in Upstash -> Value: ${val}, TTL: ${ttl}s`);
-  if (Number(val) < 4 || Number(ttl) <= 0) {
-    throw new Error(`Key was not recorded in Upstash Redis properly! Val: ${val}, TTL: ${ttl}`);
+  console.log(`    Key "${rawKey}" in Upstash -> Active Entries (ZCARD): ${card}, TTL: ${ttl}s`);
+  if (Number(card) < 3 || Number(ttl) <= 0) {
+    throw new Error(`Key was not recorded in Upstash Redis properly! ZCARD: ${card}, TTL: ${ttl}`);
   }
   console.log("    ✅ Key confirmed directly in remote Upstash database with active TTL!");
 

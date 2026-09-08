@@ -354,33 +354,36 @@ async function runProfileAndTaskTests() {
 
   // Test 6b: Validating Server-Side Task Submission Deadline Enforcement
   console.log("Test 6b: Validating Server-Side Task Submission Deadline Enforcement...");
-  const expiredDeadline = new Date(Date.now() - 1000 * 60 * 10).toISOString(); // 10 minutes ago
-  await db.collection("recruitment_config").doc("deadlines").set({
-    departments: {
-      "Design": {
-        round2Deadline: expiredDeadline,
-        updatedAt: new Date().toISOString(),
+  const testDeadline6bDocId = `test_deadlines_6b_${Date.now()}`;
+  try {
+    const expiredDeadline = new Date(Date.now() - 1000 * 60 * 10).toISOString(); // 10 minutes ago
+    await db.collection("recruitment_config").doc(testDeadline6bDocId).set({
+      departments: {
+        "Design": {
+          round2Deadline: expiredDeadline,
+          updatedAt: new Date().toISOString(),
+        },
       },
-    },
-  }, { merge: true });
+    });
 
-  const deadlinesSnap = await db.collection("recruitment_config").doc("deadlines").get();
-  const dData = deadlinesSnap.data();
-  const designR2Deadline = dData.departments?.["Design"]?.round2Deadline;
-  const isExpired = Boolean(designR2Deadline && new Date() > new Date(designR2Deadline));
+    const deadlinesSnap = await db.collection("recruitment_config").doc(testDeadline6bDocId).get();
+    const dData = deadlinesSnap.data();
+    const designR2Deadline = dData.departments?.["Design"]?.round2Deadline;
+    const isExpired = Boolean(designR2Deadline && new Date() > new Date(designR2Deadline));
 
-  if (!isExpired) {
-    throw new Error("Expected Design Round 2 deadline to evaluate as expired!");
+    if (!isExpired) {
+      throw new Error("Expected Design Round 2 deadline to evaluate as expired!");
+    }
+    console.log("  ✓ Server-side expired deadline condition successfully detected and enforced.");
+  } finally {
+    await db.collection("recruitment_config").doc(testDeadline6bDocId).delete().catch(() => {});
   }
-  console.log("  ✓ Server-side expired deadline condition successfully detected and enforced.");
 
   // Test 6c: Validating Candidate UI Closed State on Expired Deadlines
   console.log("Test 6c: Validating Candidate UI Closed State on Expired Deadlines...");
+  const { checkIsDeadlinePassed, resolveRound2StatusConfig } = await import("../lib/round-status.js");
   const pastDeadline = new Date(Date.now() - 1000 * 60 * 30).toISOString(); // 30 mins ago
   const futureDeadline = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(); // 24 hours future
-
-  const checkIsDeadlinePassed = (deadline) =>
-    Boolean(deadline && !isNaN(Date.parse(deadline)) && Date.now() > new Date(deadline).getTime());
 
   if (!checkIsDeadlinePassed(pastDeadline)) {
     throw new Error("Expired deadline was incorrectly evaluated as active!");
@@ -388,22 +391,6 @@ async function runProfileAndTaskTests() {
   if (checkIsDeadlinePassed(futureDeadline)) {
     throw new Error("Future active deadline was incorrectly evaluated as expired!");
   }
-
-  // Verify status config override for expired pending submission
-  const resolveRound2StatusConfig = (status, deadline) => {
-    const isDeadlinePassed = checkIsDeadlinePassed(deadline);
-    const isActionRequired = status === "pending_submission";
-    if (isActionRequired && isDeadlinePassed) {
-      return { label: "CLOSED", color: "text-rose-400 border-rose-500/40 bg-rose-500/10" };
-    }
-    if (isActionRequired) {
-      return { label: "ACTION REQUIRED", color: "text-emerald-400 border-emerald-500" };
-    }
-    if (status === "submitted") {
-      return { label: "SUBMITTED", color: "text-blue-400 border-blue-500/40" };
-    }
-    return { label: "LOCKED", color: "text-muted-foreground" };
-  };
 
   const pendingExpired = resolveRound2StatusConfig("pending_submission", pastDeadline);
   if (pendingExpired.label !== "CLOSED") {

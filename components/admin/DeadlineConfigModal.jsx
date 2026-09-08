@@ -175,7 +175,8 @@ export default function DeadlineConfigModal({
           </div>
 
           {loading ? (
-            <div className="space-y-4">
+            <div role="status" aria-busy="true" className="space-y-4">
+              <span className="sr-only">Loading deadline configuration...</span>
               {/* Department Selector Skeleton */}
               <div className="space-y-2 bg-muted/40 p-3.5 rounded-xl border border-border/80">
                 <div className="flex items-center justify-between">

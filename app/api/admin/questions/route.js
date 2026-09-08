@@ -128,18 +128,34 @@ export async function PATCH(req) {
     const body = await req.json().catch(() => ({}));
     const { department, questions } = body;
 
-    if (!department || typeof department !== "string") {
+    const rawDept = typeof department === "string" ? department.trim() : "";
+    if (!rawDept) {
       return NextResponse.json(
         { success: false, message: "Department name is required" },
         { status: 400 }
       );
     }
 
-    if (!canAccessDepartment(session.user, department, roleConfig)) {
+    const matchedDept = departmentsData.find(
+      (d) =>
+        d.name.toLowerCase() === rawDept.toLowerCase() ||
+        d.id.toLowerCase() === rawDept.toLowerCase()
+    );
+
+    if (!matchedDept) {
+      return NextResponse.json(
+        { success: false, message: `Unknown department: "${rawDept}"` },
+        { status: 400 }
+      );
+    }
+
+    const canonicalDept = matchedDept.name;
+
+    if (!canAccessDepartment(session.user, canonicalDept, roleConfig)) {
       return NextResponse.json(
         {
           success: false,
-          message: `Forbidden: You do not have permission to configure questions for the "${department}" department`,
+          message: `Forbidden: You do not have permission to configure questions for the "${canonicalDept}" department`,
         },
         { status: 403 }
       );
@@ -152,25 +168,34 @@ export async function PATCH(req) {
       );
     }
 
-    // Validate and clean each question
-    const sanitizedQuestions = questions.map((q, idx) => {
+    // Validate and clean each question, rejecting duplicates
+    const seenNames = new Set();
+    const sanitizedQuestions = [];
+    for (let idx = 0; idx < questions.length; idx++) {
+      const q = questions[idx];
       const name = String(q.name || q.question || "").trim();
       if (!name) {
         throw new Error(`Question #${idx + 1} cannot have empty text`);
       }
-      return {
+      const lowerName = name.toLowerCase();
+      if (seenNames.has(lowerName)) {
+        throw new Error(`Duplicate question text found: "${name}"`);
+      }
+      seenNames.add(lowerName);
+
+      sanitizedQuestions.push({
         id: q.id || `q_${idx + 1}_${Date.now()}`,
         name,
         type: ["generic", "short-text", "long-text"].includes(q.type) ? q.type : "generic",
         placeholder: String(q.placeholder || "Your answer...").trim(),
-      };
-    });
+      });
+    }
 
-    const slug = normalizeDeptSlug(department);
+    const slug = normalizeDeptSlug(canonicalDept);
     const nowIso = new Date().toISOString();
 
     const deptPayload = {
-      department,
+      department: canonicalDept,
       departmentSlug: slug,
       questions: sanitizedQuestions,
       updatedAt: nowIso,

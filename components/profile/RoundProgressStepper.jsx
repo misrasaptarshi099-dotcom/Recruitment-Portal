@@ -18,6 +18,7 @@ import {
 import TaskSubmissionDrawer from "./TaskSubmissionDrawer";
 import TaskBriefModal from "./TaskBriefModal";
 import InterviewSlotPickerModal from "./InterviewSlotPickerModal";
+import { checkIsDeadlinePassed, resolveRound2StatusConfig } from "@/lib/round-status";
 
 const statusConfigs = {
   cleared: {
@@ -130,8 +131,7 @@ export default function RoundProgressStepper({
       <div className={cn("grid grid-cols-1 md:grid-cols-3 gap-3", className)}>
         {roundList.map((round) => {
           const isDeadlinePassed = Boolean(
-            round.isDeadlinePassed ||
-            (round.deadline && !isNaN(Date.parse(round.deadline)) && Date.now() > new Date(round.deadline).getTime())
+            round.isDeadlinePassed || checkIsDeadlinePassed(round.deadline)
           );
           const isLocked = round.status === "locked";
           const isActionRequired = round.status === "pending_submission";
@@ -141,12 +141,15 @@ export default function RoundProgressStepper({
           const isAwaitingSlot = round.status === "awaiting_schedule";
 
           let cfg = statusConfigs[round.status] || statusConfigs.locked;
-          if (round.key === "round2" && isActionRequired && isDeadlinePassed) {
-            cfg = {
-              label: "CLOSED",
-              color: "text-rose-400 border-rose-500/40 bg-rose-500/10",
-              icon: Lock,
-            };
+          if (round.key === "round2") {
+            const r2Cfg = resolveRound2StatusConfig(round.status, round.deadline);
+            if (r2Cfg.label === "CLOSED") {
+              cfg = {
+                label: r2Cfg.label,
+                color: r2Cfg.color,
+                icon: Lock,
+              };
+            }
           }
           const Icon = cfg.icon;
 

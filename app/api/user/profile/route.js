@@ -6,6 +6,7 @@ import { departmentsData } from "@/constants/departments-data";
 import { isAdminEmail, isActiveAssignment } from "@/lib/security";
 import { loadRoleConfig, purgeRevokedNonInstitutionalUser } from "@/lib/admin-auth";
 import { redis } from "@/lib/redis";
+import { normalizeDeptSlug } from "@/lib/bcnf";
 
 export const dynamic = "force-dynamic";
 
@@ -323,7 +324,8 @@ export async function GET() {
       const isTech = TECHNICAL_DEPTS.has(deptLower);
       const deptTone = departmentsData.find((d) => d.name.toLowerCase() === deptLower)?.tone || (isTech ? "#4285F4" : "#0F9D58");
       const defaultTask = DEFAULT_ROUND2_PROMPTS[deptLower] || DEFAULT_ROUND2_PROMPTS.default;
-      const customTask = customRound2Tasks[app.departmentSlug] || customRound2Tasks[app.department];
+      const deptSlug = app.departmentSlug || normalizeDeptSlug(app.department || "");
+      const customTask = customRound2Tasks[deptSlug] || customRound2Tasks[app.department];
 
       const isR2Cleared = Boolean(
         app.round2Cleared ||

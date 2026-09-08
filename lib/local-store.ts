@@ -312,7 +312,20 @@ export const localDb = {
                 typeof existing.departments === "object" &&
                 typeof data.departments === "object"
               ) {
-                merged.departments = { ...existing.departments, ...data.departments };
+                const mergedDepts = { ...existing.departments };
+                for (const [deptKey, incomingVal] of Object.entries(data.departments)) {
+                  if (
+                    incomingVal &&
+                    typeof incomingVal === "object" &&
+                    mergedDepts[deptKey] &&
+                    typeof mergedDepts[deptKey] === "object"
+                  ) {
+                    mergedDepts[deptKey] = { ...mergedDepts[deptKey], ...(incomingVal as object) };
+                  } else {
+                    mergedDepts[deptKey] = incomingVal;
+                  }
+                }
+                merged.departments = mergedDepts;
               }
               items[index] = merged;
             } else if (index >= 0) {

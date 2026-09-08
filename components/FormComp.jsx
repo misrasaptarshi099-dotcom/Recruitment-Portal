@@ -78,6 +78,7 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
     : null;
 
   const [dynamicQuestionnaires, setDynamicQuestionnaires] = useState(QuestionnaireData);
+  const [isQuestionsReady, setIsQuestionsReady] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -92,6 +93,10 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
         }
       } catch (err) {
         console.warn("Notice: Using default questionnaire data:", err?.message || err);
+      } finally {
+        if (isMounted) {
+          setIsQuestionsReady(true);
+        }
       }
     }
     fetchLatestQuestions();
@@ -400,7 +405,7 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
     }
   };
 
-  if (isLoading || !isDraftReady) {
+  if (isLoading || !isDraftReady || !isQuestionsReady) {
     return <FormSkeleton departmentNames={departmentNames} isOnline={isOnline} />;
   }
 

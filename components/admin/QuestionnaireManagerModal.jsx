@@ -185,12 +185,20 @@ export default function QuestionnaireManagerModal({
       return;
     }
 
-    // Validate that no question has blank text
+    // Validate that no question has blank text or duplicate names
+    const seenNames = new Set();
     for (let i = 0; i < currentQuestions.length; i++) {
-      if (!currentQuestions[i].name || !currentQuestions[i].name.trim()) {
+      const trimmed = (currentQuestions[i].name || "").trim();
+      if (!trimmed) {
         toast.error(`Question #${i + 1} cannot have empty text.`);
         return;
       }
+      const lower = trimmed.toLowerCase();
+      if (seenNames.has(lower)) {
+        toast.error(`Question #${i + 1} has duplicate text: "${trimmed}". All questions must be unique.`);
+        return;
+      }
+      seenNames.add(lower);
     }
 
     setSaving(true);

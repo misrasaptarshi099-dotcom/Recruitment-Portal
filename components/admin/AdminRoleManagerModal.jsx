@@ -295,7 +295,8 @@ export default function AdminRoleManagerModal({
             </div>
 
             {loading && assignmentEntries.length === 0 ? (
-              <div className="border border-border/60 rounded-xl overflow-hidden">
+              <div role="status" aria-busy="true" className="border border-border/60 rounded-xl overflow-hidden">
+                <span className="sr-only">Loading role assignments...</span>
                 <table className="w-full text-left text-xs">
                   <thead className="bg-muted/40 border-b border-border/60 text-muted-foreground font-mono uppercase text-[10px]">
                     <tr>

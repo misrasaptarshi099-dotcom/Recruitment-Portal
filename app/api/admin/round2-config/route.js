@@ -6,6 +6,7 @@ import { isUserAdmin, isSuperAdmin, canAccessDepartment, getUserAdminRole } from
 import { rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 import { loadRoleConfig } from "@/lib/admin-auth";
 import { departmentsData } from "@/constants/departments-data";
+import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
 
@@ -218,18 +219,34 @@ export async function PATCH(req) {
       deadline,
     } = body;
 
-    if (!department || typeof department !== "string") {
+    const rawDept = typeof department === "string" ? department.trim() : "";
+    if (!rawDept) {
       return NextResponse.json(
         { success: false, message: "Department name is required" },
         { status: 400 }
       );
     }
 
-    if (!canAccessDepartment(session.user, department, roleConfig)) {
+    const matchedDept = departmentsData.find(
+      (d) =>
+        d.name.toLowerCase() === rawDept.toLowerCase() ||
+        d.id.toLowerCase() === rawDept.toLowerCase()
+    );
+
+    if (!matchedDept) {
+      return NextResponse.json(
+        { success: false, message: `Unknown department: "${rawDept}"` },
+        { status: 400 }
+      );
+    }
+
+    const canonicalDept = matchedDept.name;
+
+    if (!canAccessDepartment(session.user, canonicalDept, roleConfig)) {
       return NextResponse.json(
         {
           success: false,
-          message: `Forbidden: You do not have permission to configure Round 2 tasks for the "${department}" department`,
+          message: `Forbidden: You do not have permission to configure Round 2 tasks for the "${canonicalDept}" department`,
         },
         { status: 403 }
       );
@@ -246,7 +263,10 @@ export async function PATCH(req) {
     const trimmedUrl = String(taskDocumentUrl || "").trim();
     if (trimmedUrl) {
       try {
-        new URL(trimmedUrl);
+        const parsed = new URL(trimmedUrl);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          throw new Error("Invalid scheme");
+        }
       } catch {
         return NextResponse.json(
           { success: false, message: "Invalid URL format. Please provide a valid HTTP/HTTPS link." },
@@ -255,11 +275,11 @@ export async function PATCH(req) {
       }
     }
 
-    const slug = normalizeDeptSlug(department);
+    const slug = normalizeDeptSlug(canonicalDept);
     const nowIso = new Date().toISOString();
 
     const taskPayload = {
-      department,
+      department: canonicalDept,
       departmentSlug: slug,
       title: trimmedTitle,
       description: String(description || "").trim(),
@@ -288,9 +308,12 @@ export async function PATCH(req) {
         { merge: true }
       );
 
+    // Invalidate Redis cache
+    await redis.del("recruitment_config:round2_tasks");
+
     return NextResponse.json({
       success: true,
-      message: `Round 2 Task for "${department}" updated successfully`,
+      message: `Round 2 Task for "${canonicalDept}" updated successfully`,
       data: taskPayload,
     });
   } catch (error) {

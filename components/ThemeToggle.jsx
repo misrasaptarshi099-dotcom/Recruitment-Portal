@@ -6,7 +6,7 @@ import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 
 export default function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   // Avoid hydration mismatch
@@ -16,13 +16,19 @@ export default function ThemeToggle() {
 
   const toggleTheme = (e) => {
     const isDark =
+      resolvedTheme === "dark" ||
       theme === "dark" ||
       (theme === "system" &&
+        typeof window !== "undefined" &&
         window.matchMedia("(prefers-color-scheme: dark)").matches);
     const nextTheme = isDark ? "light" : "dark";
 
-    // Fallback if browser doesn't support startViewTransition
-    if (typeof document === "undefined" || !document.startViewTransition) {
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Skip view transition if reduced motion requested or unsupported
+    if (prefersReducedMotion || typeof document === "undefined" || !document.startViewTransition) {
       setTheme(nextTheme);
       return;
     }
@@ -72,13 +78,15 @@ export default function ThemeToggle() {
     );
   }
 
+  const effectiveTheme = resolvedTheme || (theme === "dark" ? "dark" : "light");
+
   return (
     <Button
       variant="outline"
       size="icon"
       onClick={toggleTheme}
       className="w-9 h-9 rounded-full relative overflow-hidden cursor-pointer transition-transform hover:scale-105 active:scale-95"
-      title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+      title={`Switch to ${effectiveTheme === "dark" ? "light" : "dark"} mode`}
     >
       <Sun className="h-[1.1rem] w-[1.1rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
       <Moon className="absolute h-[1.1rem] w-[1.1rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />

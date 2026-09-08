@@ -136,7 +136,8 @@ export default function InterviewSlotPickerModal({
           </div>
 
           {loading ? (
-            <div className="space-y-5">
+            <div role="status" aria-busy="true" className="space-y-5">
+              <span className="sr-only">Loading available interview slots...</span>
               {/* Date Selection Skeletons */}
               <div className="space-y-2">
                 <Skeleton className="h-3 w-32" />

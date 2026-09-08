@@ -175,10 +175,13 @@ export default function Round2TaskManagerModal({
       return;
     }
     try {
-      new URL(url);
+      const parsed = new URL(url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new Error("Invalid scheme");
+      }
       window.open(url, "_blank", "noopener,noreferrer");
     } catch {
-      toast.error("Invalid URL format. Please start with https://");
+      toast.error("Invalid URL format. Please start with https:// or http://");
     }
   };
 
@@ -198,7 +201,10 @@ export default function Round2TaskManagerModal({
     const trimmedUrl = taskDocumentUrl.trim();
     if (trimmedUrl) {
       try {
-        new URL(trimmedUrl);
+        const parsed = new URL(trimmedUrl);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          throw new Error("Invalid scheme");
+        }
       } catch {
         toast.error("Please enter a valid HTTP/HTTPS link.");
         return;

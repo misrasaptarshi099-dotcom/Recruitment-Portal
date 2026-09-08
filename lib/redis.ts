@@ -132,6 +132,18 @@ export const redis = {
   },
 
   /**
+   * Execute a Lua script atomically on Upstash Redis
+   */
+  async eval<T = any>(
+    script: string,
+    keys: string[] = [],
+    args: (string | number)[] = []
+  ): Promise<T | null> {
+    const cmd: (string | number)[] = ["EVAL", script, keys.length, ...keys, ...args];
+    return executeCommand<T>(cmd);
+  },
+
+  /**
    * Run a batch of commands atomically in a single network round-trip via pipeline
    */
   async pipeline(commands: (string | number)[][]): Promise<any[]> {

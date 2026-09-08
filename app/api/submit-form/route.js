@@ -118,7 +118,13 @@ export async function POST(req) {
         }
       }
     } catch (dErr) {
-      console.warn("Could not check dynamic Round 1 deadline:", dErr?.message || dErr);
+      console.error("Could not check dynamic Round 1 deadline:", dErr?.message || dErr);
+      return new Response(
+        JSON.stringify({
+          message: "Service temporarily unavailable. Unable to verify submission deadline. Please try again.",
+        }),
+        { status: 503 }
+      );
     }
 
     const regNo = sanitizeText(formFields.RegistrationNumber || "").toUpperCase();
