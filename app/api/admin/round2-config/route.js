@@ -3,7 +3,7 @@ import { connect } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isUserAdmin, isSuperAdmin, canAccessDepartment, getUserAdminRole } from "@/lib/security";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 import { loadRoleConfig } from "@/lib/admin-auth";
 import { departmentsData } from "@/constants/departments-data";
 
@@ -181,7 +181,7 @@ export async function GET(req) {
 export async function PATCH(req) {
   try {
     const clientIp = getClientIp(req);
-    const limit = rateLimit(`admin_r2_config_${clientIp}`, {
+    const limit = await rateLimitAsync(`admin_r2_config_${clientIp}`, {
       maxRequests: 40,
       windowSeconds: 60,
     });

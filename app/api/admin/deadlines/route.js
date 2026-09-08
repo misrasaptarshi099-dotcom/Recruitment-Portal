@@ -3,7 +3,7 @@ import { connect } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isUserAdmin, isSuperAdmin, canAccessDepartment, getUserAdminRole } from "@/lib/security";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 import { loadRoleConfig } from "@/lib/admin-auth";
 import { departmentsData } from "@/constants/departments-data";
 import { redis } from "@/lib/redis";
@@ -51,7 +51,7 @@ export async function GET(req) {
       isSuperAdmin: isSuper,
     });
   } catch (error) {
-    console.error("Error fetching deadlines:", error);
+    console.error("Error fetching deadlines config:", error);
     return NextResponse.json(
       { success: false, message: error.message || "Failed to fetch deadlines" },
       { status: 500 }
@@ -62,7 +62,7 @@ export async function GET(req) {
 export async function PATCH(req) {
   try {
     const clientIp = getClientIp(req);
-    const limit = rateLimit(`admin_deadlines_${clientIp}`, {
+    const limit = await rateLimitAsync(`admin_deadlines_${clientIp}`, {
       maxRequests: 30,
       windowSeconds: 60,
     });

@@ -2,7 +2,7 @@ import { submitApplicationTransaction } from "@/lib/bcnf";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isInstitutionalEmail, sanitizeText } from "@/lib/security";
-import { rateLimit, rateLimitAsync, getClientIp } from "@/lib/rate-limit";
+import { rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 

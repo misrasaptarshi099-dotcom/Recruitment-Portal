@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { departmentsData } from "@/constants/departments-data";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const COMMON_DELIVERABLES = [
   "GitHub Repository",
@@ -293,9 +294,39 @@ export default function Round2TaskManagerModal({
         </div>
 
         {loading ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-12 space-y-3">
-            <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-            <p className="text-xs font-mono text-muted-foreground">Loading task configurations...</p>
+          <div className="flex-1 min-h-0 flex flex-col p-6 space-y-4 overflow-hidden">
+            {/* Department Picker Skeleton */}
+            <div className="bg-muted/30 p-3.5 rounded-xl border border-border/60 space-y-2">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-3.5 w-36" />
+                <Skeleton className="h-3 w-44" />
+              </div>
+              <Skeleton className="h-9 w-full rounded-lg" />
+            </div>
+
+            {/* Task Title Skeleton */}
+            <div className="space-y-1.5">
+              <Skeleton className="h-3.5 w-28" />
+              <Skeleton className="h-9 w-full rounded-lg" />
+            </div>
+
+            {/* Task Description Skeleton */}
+            <div className="space-y-1.5">
+              <Skeleton className="h-3.5 w-36" />
+              <Skeleton className="h-28 w-full rounded-lg" />
+            </div>
+
+            {/* Resource Links / Deliverables Skeleton */}
+            <div className="space-y-1.5">
+              <Skeleton className="h-3.5 w-40" />
+              <Skeleton className="h-9 w-full rounded-lg" />
+            </div>
+
+            {/* Footer Buttons Skeleton */}
+            <div className="pt-2 flex justify-end gap-3 border-t border-border/40">
+              <Skeleton className="h-9 w-24 rounded-lg" />
+              <Skeleton className="h-9 w-32 rounded-lg" />
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSave} className="flex-1 min-h-0 flex flex-col overflow-hidden">

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isUserAdmin, getUserAdminRole } from "@/lib/security";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 import { loadRoleConfig } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export async function GET(req) {
   try {
     // 1. Rate Limiting (30 requests / min per IP)
     const clientIp = getClientIp(req);
-    const limit = rateLimit(`admin_applicants_${clientIp}`, {
+    const limit = await rateLimitAsync(`admin_applicants_${clientIp}`, {
       maxRequests: 30,
       windowSeconds: 60,
     });

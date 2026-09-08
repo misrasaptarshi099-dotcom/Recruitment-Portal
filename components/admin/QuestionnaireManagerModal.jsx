@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { departmentsData } from "@/constants/departments-data";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function QuestionnaireManagerModal({
   isOpen,
@@ -275,9 +276,51 @@ export default function QuestionnaireManagerModal({
         </div>
 
         {loading ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-12 space-y-3">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-            <p className="text-xs font-mono text-muted-foreground">Loading questionnaires...</p>
+          <div className="flex-1 min-h-0 flex flex-col p-6 space-y-4 overflow-hidden">
+            {/* Department Picker Skeleton */}
+            <div className="bg-muted/30 p-3.5 rounded-xl border border-border/60 space-y-2">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-3.5 w-36" />
+                <Skeleton className="h-3 w-44" />
+              </div>
+              <Skeleton className="h-9 w-full rounded-lg" />
+            </div>
+
+            {/* Questions Header Skeleton */}
+            <div className="flex items-center justify-between px-1">
+              <Skeleton className="h-3.5 w-40" />
+              <Skeleton className="h-3.5 w-24" />
+            </div>
+
+            {/* Question Cards Skeletons */}
+            <div className="flex-1 space-y-3 overflow-hidden">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="p-4 rounded-xl border border-border/50 bg-muted/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-8 rounded" />
+                      <Skeleton className="h-4 w-28 rounded" />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Skeleton className="h-6 w-6 rounded" />
+                      <Skeleton className="h-6 w-6 rounded" />
+                      <Skeleton className="h-6 w-6 rounded" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-14 w-full rounded-lg" />
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-3 w-32" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer Buttons Skeleton */}
+            <div className="pt-2 flex justify-end gap-3 border-t border-border/40">
+              <Skeleton className="h-9 w-24 rounded-lg" />
+              <Skeleton className="h-9 w-32 rounded-lg" />
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSave} className="flex-1 min-h-0 flex flex-col overflow-hidden">

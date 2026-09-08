@@ -3,7 +3,7 @@ import { connect } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isUserAdmin, isSuperAdmin, getUserAdminRole } from "@/lib/security";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 import { departmentsData } from "@/constants/departments-data";
 import { purgeRevokedNonInstitutionalUser } from "@/lib/admin-auth";
 import { FieldValue, FieldPath } from "firebase-admin/firestore";
@@ -94,7 +94,7 @@ export async function GET(req) {
 export async function POST(req) {
   try {
     const clientIp = getClientIp(req);
-    const limit = rateLimit(`admin_roles_${clientIp}`, {
+    const limit = await rateLimitAsync(`admin_roles_${clientIp}`, {
       maxRequests: 30,
       windowSeconds: 60,
     });

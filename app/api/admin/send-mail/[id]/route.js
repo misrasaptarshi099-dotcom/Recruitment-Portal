@@ -3,7 +3,7 @@ import { connect, serializeFirestoreData } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isUserAdmin } from "@/lib/security";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 import { loadRoleConfig, authorizeDepartmentAccess } from "@/lib/admin-auth";
 import { sendDecisionEmail } from "@/lib/mailer";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req, { params }) {
   try {
     const clientIp = getClientIp(req);
-    const limit = rateLimit(`admin_sendmail_${clientIp}`, {
+    const limit = await rateLimitAsync(`admin_sendmail_${clientIp}`, {
       maxRequests: 60,
       windowSeconds: 60,
     });
