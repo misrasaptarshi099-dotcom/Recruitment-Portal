@@ -231,23 +231,39 @@ export default function DinoGame({
     sfx.enabled = soundEnabled;
   }, [soundEnabled]);
 
-  // Load initial high score
+  // Load initial high score & synchronize between local storage and user account
   useEffect(() => {
+    let localHigh = 0;
     try {
       const saved = localStorage.getItem("gdg_dino_high_score");
       if (saved) {
-        const val = Number(saved) || 0;
-        setHighScore(val);
-        if (onHighScoreUpdate) onHighScoreUpdate(val);
+        localHigh = Number(saved) || 0;
+        setHighScore(localHigh);
+        if (onHighScoreUpdate) onHighScoreUpdate(localHigh);
       }
     } catch {}
 
-    // Also attempt fetching from user account if signed in
+    // Also fetch high score from user account if signed in
     fetch("/api/user/dino-score")
       .then((res) => res.json())
       .then((data) => {
-        if (data?.highScore && data.highScore > 0) {
-          setHighScore((prev) => Math.max(prev, data.highScore));
+        if (data?.highScore && Number(data.highScore) > 0) {
+          const remoteHigh = Number(data.highScore);
+          const best = Math.max(localHigh, remoteHigh);
+          setHighScore(best);
+          try {
+            localStorage.setItem("gdg_dino_high_score", String(best));
+          } catch {}
+          if (onHighScoreUpdate) onHighScoreUpdate(best);
+
+          // If local storage score was higher than remote (e.g. played offline or as guest), sync to backend
+          if (localHigh > remoteHigh) {
+            fetch("/api/user/dino-score", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ score: localHigh }),
+            }).catch(() => {});
+          }
         }
       })
       .catch(() => {});
@@ -259,17 +275,40 @@ export default function DinoGame({
       if (score <= 0) return;
       try {
         const saved = Number(localStorage.getItem("gdg_dino_high_score") || 0);
+        let best = Math.max(saved, score);
         if (score > saved) {
           localStorage.setItem("gdg_dino_high_score", String(score));
           setHighScore(score);
           if (onHighScoreUpdate) onHighScoreUpdate(score);
         }
+
         // Send to backend (silently continues if offline/guest)
-        fetch("/api/user/dino-score", {
+        const res = await fetch("/api/user/dino-score", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ score }),
-        }).catch(() => {});
+        });
+
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (data?.highScore && Number(data.highScore) > 0) {
+            const serverBest = Number(data.highScore);
+            if (serverBest > best) {
+              best = serverBest;
+              localStorage.setItem("gdg_dino_high_score", String(best));
+              setHighScore(best);
+              if (onHighScoreUpdate) onHighScoreUpdate(best);
+            }
+          }
+          // Invalidate profile cache so navigating to /profile immediately reflects the latest score
+          try {
+            Object.keys(sessionStorage).forEach((key) => {
+              if (key.startsWith("gdg_profile_cache")) {
+                sessionStorage.removeItem(key);
+              }
+            });
+          } catch {}
+        }
       } catch {}
     },
     [onHighScoreUpdate]
