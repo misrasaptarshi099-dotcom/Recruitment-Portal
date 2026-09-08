@@ -72,7 +72,8 @@ export async function PATCH(req, { params }) {
     }
 
     // Department scoping guard
-    const applicantDept = (snapshot.data() || {}).Department || "";
+    const docData = snapshot.data() || {};
+    const applicantDept = docData.Department || docData.department || "";
     const deptAuth = authorizeDepartmentAccess(session.user, applicantDept, roleConfig);
     if (!deptAuth.authorized) {
       return NextResponse.json(
@@ -81,7 +82,7 @@ export async function PATCH(req, { params }) {
       );
     }
 
-    const currentData = snapshot.data() || {};
+    const currentData = docData;
     let appData = {};
     try {
       const appSnap = await db.collection("applications").doc(id).get();

@@ -70,9 +70,9 @@ function AccessDeniedView() {
 
 export default function AdminContent({
   applicants,
-  userRole = "super_admin",
+  userRole = null,
   assignedDepartments = [],
-  isSuperAdmin: isSuperAdminProp = true,
+  isSuperAdmin: isSuperAdminProp = false,
 }) {
   const { data: session, isPending } = authClient.useSession();
   const [activeRound, setActiveRound] = React.useState("round1");
@@ -90,7 +90,7 @@ export default function AdminContent({
       if (res.ok && json.success) {
         toast.success(`✅ SMTP Connected: ${json.sender}`);
       } else {
-        toast.error(`❌ SMTP Issue: ${json.message}`);
+        toast.error(`❌ SMTP Issue: ${json.message || "Failed to verify SMTP status"}`);
       }
     } catch (err) {
       toast.error("Failed to connect to SMTP server");

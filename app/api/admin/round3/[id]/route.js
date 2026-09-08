@@ -91,7 +91,8 @@ export async function PATCH(req, { params }) {
     const isRound3MailSent = Boolean(existingData.round3MailSent || appData.round3MailSent);
 
     // Decision state lock: Once send mail is pressed, decision state cannot be changed
-    if (status && isRound3MailSent) {
+    const willChangeStatus = Boolean(status || slotTime !== undefined);
+    if (isRound3MailSent && willChangeStatus) {
       return NextResponse.json(
         {
           success: false,

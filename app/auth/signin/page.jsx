@@ -113,9 +113,9 @@ function SignInContent() {
 
   // Determine explicit human-readable rejection reason
   const rejectionReason = useMemo(() => {
-    if (reasonParam) return decodeURIComponent(reasonParam);
-    if (errorDescParam) return decodeURIComponent(errorDescParam);
-    if (messageParam) return decodeURIComponent(messageParam);
+    if (reasonParam) return reasonParam;
+    if (errorDescParam) return errorDescParam;
+    if (messageParam) return messageParam;
     if (errorParam) {
       switch (errorParam.toLowerCase()) {
         case "forbidden":

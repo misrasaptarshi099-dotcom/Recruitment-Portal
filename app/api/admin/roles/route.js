@@ -6,6 +6,7 @@ import { isUserAdmin, isSuperAdmin, getUserAdminRole } from "@/lib/security";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { departmentsData } from "@/constants/departments-data";
 import { purgeRevokedNonInstitutionalUser } from "@/lib/admin-auth";
+import { FieldValue, FieldPath } from "firebase-admin/firestore";
 
 export const dynamic = "force-dynamic";
 
@@ -331,10 +332,14 @@ export async function DELETE(req) {
       delete assignments[normalizedEmail];
     }
 
-    await db.collection("recruitment_config").doc("admin_roles").set(
-      { assignments },
-      { merge: false }
-    );
+    const roleDocRef = db.collection("recruitment_config").doc("admin_roles");
+    const assignmentFieldPath = new FieldPath("assignments", normalizedEmail);
+
+    if (assignments[normalizedEmail]) {
+      await roleDocRef.update(assignmentFieldPath, assignments[normalizedEmail]);
+    } else {
+      await roleDocRef.update(assignmentFieldPath, FieldValue.delete());
+    }
 
     // If role assignment was completely deleted, purge non-institutional account if applicable
     if (!assignments[normalizedEmail]) {

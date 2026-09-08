@@ -158,9 +158,16 @@ export async function POST(req) {
         throw new Error("You must be cleared for Round 2 before reserving an interview slot.");
       }
 
-      // If user had a previously booked different slot, release the old slot
+      // If user had a previously booked different slot, read it before any writes
+      let oldSlotRef = null;
+      let oldSlotSnap = null;
       if (formData.round3Interview?.slotId && formData.round3Interview.slotId !== slotId) {
-        const oldSlotRef = db.collection("interview_slots").doc(formData.round3Interview.slotId);
+        oldSlotRef = db.collection("interview_slots").doc(formData.round3Interview.slotId);
+        oldSlotSnap = await t.get(oldSlotRef);
+      }
+
+      // Release previously booked slot if document exists
+      if (oldSlotRef && oldSlotSnap?.exists) {
         t.update(oldSlotRef, {
           status: "available",
           bookedBy: null,

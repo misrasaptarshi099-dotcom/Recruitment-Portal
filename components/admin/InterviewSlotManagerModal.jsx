@@ -10,12 +10,34 @@ const departmentsList = Array.isArray(rawDepts) ? rawDepts : [];
 
 export default function InterviewSlotManagerModal({ isOpen, onClose, defaultDepartment = "Web Dev", allowedDepartments, onSlotsUpdated }) {
   // Filter departments for dept_managers
+  // Only null / undefined sentinel indicates unrestricted access (super admin)
   const filteredDepartmentsList = React.useMemo(() => {
-    if (!allowedDepartments || allowedDepartments.length === 0) return departmentsList;
-    return departmentsList.filter((d) => allowedDepartments.includes(d.name));
+    if (allowedDepartments == null) return departmentsList;
+    if (Array.isArray(allowedDepartments)) {
+      if (allowedDepartments.length === 0) return [];
+      return departmentsList.filter((d) => allowedDepartments.includes(d.name));
+    }
+    return departmentsList;
   }, [allowedDepartments]);
 
-  const [selectedDept, setSelectedDept] = useState(defaultDepartment || "Web Dev");
+  const [selectedDept, setSelectedDept] = useState(() => {
+    if (allowedDepartments != null && Array.isArray(allowedDepartments) && allowedDepartments.length === 0) {
+      return "";
+    }
+    if (allowedDepartments != null && Array.isArray(allowedDepartments) && allowedDepartments.length > 0) {
+      return allowedDepartments.includes(defaultDepartment) ? defaultDepartment : allowedDepartments[0];
+    }
+    return defaultDepartment || "Web Dev";
+  });
+
+  // Keep selectedDept synchronized with allowed departments
+  useEffect(() => {
+    if (filteredDepartmentsList.length === 0) {
+      if (selectedDept !== "") setSelectedDept("");
+    } else if (!filteredDepartmentsList.some((d) => d.name === selectedDept)) {
+      setSelectedDept(filteredDepartmentsList[0].name);
+    }
+  }, [filteredDepartmentsList, selectedDept]);
   const [date, setDate] = useState(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -68,6 +90,10 @@ export default function InterviewSlotManagerModal({ isOpen, onClose, defaultDepa
 
   const handleGenerateSlots = async (e) => {
     e.preventDefault();
+    if (!selectedDept || filteredDepartmentsList.length === 0) {
+      toast.error("No allowed department selected or available for slot generation");
+      return;
+    }
     if (slotCountPreview <= 0) {
       toast.error("Please enter a valid time range of at least 15 minutes");
       return;
@@ -160,13 +186,18 @@ export default function InterviewSlotManagerModal({ isOpen, onClose, defaultDepa
                 <select
                   value={selectedDept}
                   onChange={(e) => setSelectedDept(e.target.value)}
-                  className="w-full bg-background border border-border/80 px-3 py-2 text-xs font-mono rounded-lg focus:outline-none focus:ring-1 focus:ring-cyan-500 text-foreground"
+                  disabled={filteredDepartmentsList.length === 0}
+                  className="w-full bg-background border border-border/80 px-3 py-2 text-xs font-mono rounded-lg focus:outline-none focus:ring-1 focus:ring-cyan-500 text-foreground disabled:opacity-50"
                 >
-                  {(filteredDepartmentsList || []).map((d) => (
-                    <option key={d.name || d.id} value={d.name}>
-                      {d.name}
-                    </option>
-                  ))}
+                  {filteredDepartmentsList.length === 0 ? (
+                    <option value="" disabled>No allowed departments</option>
+                  ) : (
+                    filteredDepartmentsList.map((d) => (
+                      <option key={d.name || d.id} value={d.name}>
+                        {d.name}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
@@ -240,7 +271,7 @@ export default function InterviewSlotManagerModal({ isOpen, onClose, defaultDepa
                 type="submit"
                 variant="arcade"
                 size="sm"
-                disabled={generating || slotCountPreview <= 0}
+                disabled={generating || slotCountPreview <= 0 || !selectedDept || filteredDepartmentsList.length === 0}
                 className="font-mono text-xs shrink-0"
               >
                 <Plus className="h-3.5 w-3.5 mr-1" />

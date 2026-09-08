@@ -74,9 +74,11 @@ export async function GET(req) {
       }
       query = query.where("Department", "==", requestedDept);
     } else if (isDeptManager) {
-      if (departments.length === 1) {
+      if (departments.length === 0) {
+        query = query.where("Department", "==", "__NONE__");
+      } else if (departments.length === 1) {
         query = query.where("Department", "==", departments[0]);
-      } else if (departments.length > 1 && departments.length <= 10) {
+      } else {
         query = query.where("Department", "in", departments);
       }
     }
@@ -107,10 +109,7 @@ export async function GET(req) {
         ...serializeFirestoreData(doc.data()),
       }));
 
-      // Filter in-memory fallback if departments > 10 for dept_manager
-      if (isDeptManager && departments.length > 10 && !requestedDept) {
-        applicants = applicants.filter((a) => departments.includes(a.Department));
-      }
+
 
       if (returnDocs.length > 0) {
         nextCursor = returnDocs[returnDocs.length - 1].id;
@@ -139,9 +138,7 @@ export async function GET(req) {
       ...serializeFirestoreData(doc.data()),
     }));
 
-    if (isDeptManager && !requestedDept && departments.length > 10) {
-      applicants = applicants.filter((a) => departments.includes(a.Department));
-    }
+
 
     return NextResponse.json(
       { applicants, totalCount: applicants.length },

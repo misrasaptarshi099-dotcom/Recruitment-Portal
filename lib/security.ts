@@ -31,13 +31,19 @@ export function isAdminEmail(email: string): boolean {
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
 
-  // Default fallback for development/local admin
-  adminList.push("misrasaptarshi99@gmail.com");
-  adminList.push("misrasaptarshi999@gmail.com");
-  adminList.push("misrasaptarshi099@gmail.com");
-  adminList.push("admin@vitstudent.ac.in");
-
   return adminList.includes(lower);
+}
+
+/**
+ * Check whether a dynamic role assignment entry is currently active.
+ */
+export function isActiveAssignment(entry: any): boolean {
+  if (!entry || typeof entry !== "object") return false;
+  if (entry.role === "super_admin") return true;
+  if (entry.role === "dept_manager") {
+    return Array.isArray(entry.departments) && entry.departments.length > 0;
+  }
+  return false;
 }
 
 /**

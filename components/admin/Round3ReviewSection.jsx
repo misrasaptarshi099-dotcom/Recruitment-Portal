@@ -236,6 +236,11 @@ export default function Round3ReviewSection({ data = [], onDataUpdate, allowedDe
 
   const handleSendMail = useCallback(
     async (id) => {
+      const candidate = data.find((c) => (c._id || c.id) === id);
+      const candidateName = candidate?.Name || "this candidate";
+      if (!window.confirm(`Are you sure you want to send the final Round 3 decision email to ${candidateName}? This will permanently lock the decision.`)) {
+        return;
+      }
       setActionLoading(id);
       try {
         const res = await fetch(`/api/admin/send-mail/${id}`, {
@@ -608,7 +613,7 @@ export default function Round3ReviewSection({ data = [], onDataUpdate, allowedDe
       <InterviewSlotManagerModal
         isOpen={slotConfigModalOpen}
         onClose={() => setSlotConfigModalOpen(false)}
-        defaultDepartment={selectedDept !== "All" ? selectedDept : (allowedDepartments?.length === 1 ? allowedDepartments[0] : "Web Dev")}
+        defaultDepartment={selectedDept !== "All" ? selectedDept : (allowedDepartments?.length ? allowedDepartments[0] : "Web Dev")}
         allowedDepartments={allowedDepartments}
         onSlotsUpdated={() => {
           // If parent provided onDataUpdate or refresh

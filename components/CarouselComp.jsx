@@ -97,14 +97,18 @@ export default function CarouselComp({
                                                 </p>
                                             )}
                                         </div>
-                                        {Boolean(shortlistStatus[index]) && Boolean(data.round1MailSent) ? (
+                                        {Boolean(data.round1MailSent) ? (
                                             <Button
                                                 disabled
                                                 className="bg-muted/60 text-muted-foreground border border-border/80 cursor-not-allowed select-none rounded-md mt-4 shrink-0 inline-flex items-center justify-center gap-1.5"
                                                 title="Decision email sent. Round 1 decision is permanently locked."
                                             >
                                                 <Lock className="h-4 w-4 text-amber-500" />
-                                                <span>Shortlisted (Mail Sent 🔒)</span>
+                                                <span>
+                                                    {shortlistStatus[index]
+                                                        ? "Shortlisted (Mail Sent 🔒)"
+                                                        : "Decision Locked (Mail Sent 🔒)"}
+                                                </span>
                                             </Button>
                                         ) : (
                                             <Button

@@ -512,6 +512,12 @@ async function runProfileAndTaskTests() {
     db.collection("formData").doc(mailLockAppId).delete(),
     db.collection("applications").doc(mailLockAppId).delete(),
     db.collection("interview_slots").doc(testSlotId).delete(),
+    db.collection("formData").doc(testAppId).delete(),
+    db.collection("applications").doc(testAppId).delete(),
+    db.collection("formData").doc(sampleAnswersAppId).delete(),
+    db.collection("applications").doc(sampleAnswersAppId).delete(),
+    db.collection("formData").doc(r2TestAppId).delete(),
+    db.collection("applications").doc(r2TestAppId).delete(),
   ]);
 
   console.log("  ✓ Per-round Send Mail decision state locking verified (decisions unlocked before mail, locked after mail).");
@@ -542,71 +548,76 @@ async function runProfileAndTaskTests() {
     throw new Error("SMTP connection check failed to return expected structure!");
   }
 
-  // Verify Round 1 Shortlisted Email
-  const r1ShortlistResult = await sendDecisionEmail({
-    to: "test.candidate@vitstudent.ac.in",
-    candidateName: "Test Student",
-    department: "Web Dev",
-    round: "round1",
-    decision: "shortlisted",
-  });
-  if (!r1ShortlistResult.success) {
-    throw new Error("Round 1 shortlist email dispatch failed!");
-  }
+  // Only run mock dispatch tests when smtpCheck.configured is false to avoid sending real emails
+  if (!smtpCheck.configured) {
+    // Verify Round 1 Shortlisted Email
+    const r1ShortlistResult = await sendDecisionEmail({
+      to: "test.candidate@vitstudent.ac.in",
+      candidateName: "Test Student",
+      department: "Web Dev",
+      round: "round1",
+      decision: "shortlisted",
+    });
+    if (!r1ShortlistResult.success) {
+      throw new Error("Round 1 shortlist email dispatch failed!");
+    }
 
-  // Verify Round 2 Cleared Email
-  const r2ClearedResult = await sendDecisionEmail({
-    to: "test.candidate@vitstudent.ac.in",
-    candidateName: "Test Student",
-    department: "App Dev",
-    round: "round2",
-    decision: "cleared",
-  });
-  if (!r2ClearedResult.success) {
-    throw new Error("Round 2 cleared email dispatch failed!");
-  }
+    // Verify Round 2 Cleared Email
+    const r2ClearedResult = await sendDecisionEmail({
+      to: "test.candidate@vitstudent.ac.in",
+      candidateName: "Test Student",
+      department: "App Dev",
+      round: "round2",
+      decision: "cleared",
+    });
+    if (!r2ClearedResult.success) {
+      throw new Error("Round 2 cleared email dispatch failed!");
+    }
 
-  // Verify Round 3 Final Offer Email
-  const r3OfferResult = await sendDecisionEmail({
-    to: "test.candidate@vitstudent.ac.in",
-    candidateName: "Test Student",
-    department: "Machine Learning",
-    round: "round3",
-    decision: "selected",
-  });
-  if (!r3OfferResult.success) {
-    throw new Error("Round 3 offer email dispatch failed!");
-  }
+    // Verify Round 3 Final Offer Email
+    const r3OfferResult = await sendDecisionEmail({
+      to: "test.candidate@vitstudent.ac.in",
+      candidateName: "Test Student",
+      department: "Machine Learning",
+      round: "round3",
+      decision: "selected",
+    });
+    if (!r3OfferResult.success) {
+      throw new Error("Round 3 offer email dispatch failed!");
+    }
 
-  // Verify Interview Slot Booking Confirmation Email
-  const slotConfirmResult = await sendInterviewConfirmationEmail({
-    to: "test.candidate@vitstudent.ac.in",
-    candidateName: "Test Student",
-    department: "Web Dev",
-    slotDetails: {
-      date: "2026-09-12",
-      slotLabel: "04:30 PM - 04:45 PM",
-      meetingLink: "https://meet.google.com/xyz-gdg-slot",
-    },
-  });
-  if (!slotConfirmResult.success) {
-    throw new Error("Interview slot confirmation email dispatch failed!");
-  }
+    // Verify Interview Slot Booking Confirmation Email
+    const slotConfirmResult = await sendInterviewConfirmationEmail({
+      to: "test.candidate@vitstudent.ac.in",
+      candidateName: "Test Student",
+      department: "Web Dev",
+      slotDetails: {
+        date: "2026-09-12",
+        slotLabel: "04:30 PM - 04:45 PM",
+        meetingLink: "https://meet.google.com/xyz-gdg-slot",
+      },
+    });
+    if (!slotConfirmResult.success) {
+      throw new Error("Interview slot confirmation email dispatch failed!");
+    }
 
-  // Verify Batch Announcement Email Template
-  const batchResult = await sendBatchAnnouncementEmail({
-    recipients: [
-      { Email: "test.batch1@vitstudent.ac.in", Name: "Student One", Department: "Web Dev" },
-      { Email: "test.batch2@vitstudent.ac.in", Name: "Student Two", Department: "App Dev" },
-    ],
-    subject: "Important GDG Announcement",
-    bodyTemplate: "Hello #name, thank you for joining #dept orientation!",
-  });
-  if (!batchResult.success) {
-    throw new Error("Batch announcement email dispatch failed!");
-  }
+    // Verify Batch Announcement Email Template
+    const batchResult = await sendBatchAnnouncementEmail({
+      recipients: [
+        { Email: "test.batch1@vitstudent.ac.in", Name: "Student One", Department: "Web Dev" },
+        { Email: "test.batch2@vitstudent.ac.in", Name: "Student Two", Department: "App Dev" },
+      ],
+      subject: "Important GDG Announcement",
+      bodyTemplate: "Hello #name, thank you for joining #dept orientation!",
+    });
+    if (!batchResult.success) {
+      throw new Error("Batch announcement email dispatch failed!");
+    }
 
-  console.log("  ✓ Central Mailer engine, decision templates, slot booking confirmation & batch broadcast verified.");
+    console.log("  ✓ Central Mailer engine, decision templates, slot booking confirmation & batch broadcast verified.");
+  } else {
+    console.log("  ✓ SMTP credentials configured; skipped sending to test emails during test run.");
+  }
 
   console.log("\n>>> ALL PHASE 5 & 6 INTERVIEW SLOTS, DEADLINES, TASKS & MAILER TESTS PASSED! <<<");
 }

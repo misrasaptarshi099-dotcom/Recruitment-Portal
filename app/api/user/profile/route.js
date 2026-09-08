@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { connect } from "@/lib/db";
 import { departmentsData } from "@/constants/departments-data";
-import { isAdminEmail } from "@/lib/security";
+import { isAdminEmail, isActiveAssignment } from "@/lib/security";
 import { loadRoleConfig, purgeRevokedNonInstitutionalUser } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -121,7 +121,7 @@ export async function GET() {
     // Enforce Institutional Domain: Only @vitstudent.ac.in permitted for candidate profiles
     if (!email.endsWith("@vitstudent.ac.in") && !isAdminEmail(email)) {
       const roleConfig = await loadRoleConfig(db);
-      const isDynamicAdmin = Boolean(roleConfig?.assignments && roleConfig.assignments[email]);
+      const isDynamicAdmin = Boolean(roleConfig?.assignments && isActiveAssignment(roleConfig.assignments[email]));
       if (!isDynamicAdmin) {
         await purgeRevokedNonInstitutionalUser(db, email);
         return NextResponse.json(

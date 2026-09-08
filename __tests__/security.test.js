@@ -3,6 +3,7 @@ const { isInstitutionalEmail, isAdminEmail, isUserAdmin, sanitizeText, isSuperAd
 
 async function runSecurityTests() {
   console.log("=== Running Phase 2 Security & Rate Limiting Test Suite ===");
+  process.env.ADMIN_EMAILS = "env_admin_1@example.com,env_admin_2@example.com";
 
   // Test 1: Institutional Domain Enforcement
   console.log("Test 1: Validating Institutional Domain Lock...");
@@ -26,10 +27,10 @@ async function runSecurityTests() {
   if (!isUserAdmin({ role: "admin", email: "organizer@gdg.org" })) {
     throw new Error("Admin role user was denied admin access!");
   }
-  if (!isUserAdmin({ role: "user", email: "misrasaptarshi99@gmail.com" })) {
-    throw new Error("Allowlisted admin email misrasaptarshi99@gmail.com was denied admin access!");
+  if (!isUserAdmin({ role: "user", email: "env_admin_1@example.com" })) {
+    throw new Error("Allowlisted admin email env_admin_1@example.com was denied admin access!");
   }
-  if (!isUserAdmin({ role: "user", email: "misrasaptarshi999@gmail.com" })) {
+  if (!isUserAdmin({ role: "user", email: "env_admin_2@example.com" })) {
     throw new Error("Allowlisted admin email was denied admin access!");
   }
 
@@ -43,14 +44,14 @@ async function runSecurityTests() {
   };
 
   const superUser = { email: "super@example.com", role: "user" };
-  const envSuperUser = { email: "misrasaptarshi99@gmail.com", role: "user" };
+  const envSuperUser = { email: "env_admin_1@example.com", role: "user" };
   const webLead = { email: "web_lead@example.com", role: "user" };
   const multiLead = { email: "multi_lead@example.com", role: "user" };
   const outsider = { email: "stranger@vitstudent.ac.in", role: "user" };
 
   // isSuperAdmin tests
   if (!isSuperAdmin(superUser, mockRoleConfig)) throw new Error("super@example.com should be super admin via roleConfig!");
-  if (!isSuperAdmin(envSuperUser, mockRoleConfig)) throw new Error("misrasaptarshi99@gmail.com should be super admin via allowlist!");
+  if (!isSuperAdmin(envSuperUser, mockRoleConfig)) throw new Error("env_admin_1@example.com should be super admin via allowlist!");
   if (isSuperAdmin(webLead, mockRoleConfig)) throw new Error("webLead should NOT be super admin!");
 
   // getUserAdminRole tests
@@ -66,14 +67,14 @@ async function runSecurityTests() {
   if (outsiderRole.isAuthorized) throw new Error("outsider should not be authorized!");
 
   // Allowlisted email explicitly scoped to dept_manager in roleConfig must be dept_manager, NOT super_admin
-  const scopedAdminUser = { email: "misrasaptarshi999@gmail.com", role: "user" };
+  const scopedAdminUser = { email: "env_admin_2@example.com", role: "user" };
   const scopedRoleConfig = {
     assignments: {
-      "misrasaptarshi999@gmail.com": { role: "dept_manager", departments: ["Data Science"] }
+      "env_admin_2@example.com": { role: "dept_manager", departments: ["Data Science"] }
     }
   };
   if (isSuperAdmin(scopedAdminUser, scopedRoleConfig)) {
-    throw new Error("misrasaptarshi999@gmail.com should NOT be super admin when explicitly assigned as dept_manager!");
+    throw new Error("env_admin_2@example.com should NOT be super admin when explicitly assigned as dept_manager!");
   }
   const scopedRole = getUserAdminRole(scopedAdminUser, scopedRoleConfig);
   if (!scopedRole.isAuthorized || scopedRole.role !== "dept_manager" || !scopedRole.departments.includes("Data Science")) {
@@ -290,7 +291,7 @@ async function runSecurityTests() {
   if (p1.purged) throw new Error("Institutional account was mistakenly purged!");
 
   // 2. Static allowlisted admin is never purged
-  const p2 = await purgeRevokedNonInstitutionalUser(mockDb, "misrasaptarshi99@gmail.com");
+  const p2 = await purgeRevokedNonInstitutionalUser(mockDb, "env_admin_1@example.com");
   if (p2.purged) throw new Error("Static admin was mistakenly purged!");
 
   // 3. Active dynamic manager is not purged

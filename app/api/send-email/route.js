@@ -74,13 +74,19 @@ export async function POST(req) {
       );
     }
 
-    // 4. Recipient Allowlist Verification
-    const recipientEmails = recipients.map((r) => r.Email?.toLowerCase().trim()).filter(Boolean);
+    // 4. Recipient Normalization & Allowlist Verification
+    const normalizedRecipients = recipients.map((r) => {
+      const email = (r.Email || r.email || "").toLowerCase().trim();
+      return {
+        ...r,
+        Email: email,
+      };
+    });
 
-    for (const email of recipientEmails) {
-      if (!isInstitutionalEmail(email)) {
+    for (const r of normalizedRecipients) {
+      if (!r.Email || !isInstitutionalEmail(r.Email)) {
         return new Response(
-          JSON.stringify({ error: `Unauthorized external recipient address: ${email}` }),
+          JSON.stringify({ error: `Unauthorized external recipient address: ${r.Email || "missing"}` }),
           { status: 400 }
         );
       }
@@ -88,16 +94,35 @@ export async function POST(req) {
 
     // 5. Secure Email Dispatch via central mailer
     const result = await sendBatchAnnouncementEmail({
-      recipients,
+      recipients: normalizedRecipients,
       subject: String(payloadData.subject).slice(0, 150),
       bodyTemplate: payloadData.body,
     });
 
+    if (result.simulated) {
+      return new Response(
+        JSON.stringify({
+          message: `Emails successfully simulated for ${normalizedRecipients.length} recipients (Dry Run)`,
+          ...result,
+        }),
+        { status: 200 }
+      );
+    }
+
+    if (!result.success) {
+      const status = result.successCount > 0 ? 207 : 500;
+      return new Response(
+        JSON.stringify({
+          error: `Email delivery failed for ${result.failCount} recipient(s)${result.successCount > 0 ? ` (${result.successCount} succeeded)` : ""}`,
+          ...result,
+        }),
+        { status }
+      );
+    }
+
     return new Response(
       JSON.stringify({
-        message: result.simulated
-          ? `Emails successfully simulated for ${recipients.length} recipients (Dry Run)`
-          : `Emails successfully dispatched to ${result.successCount} recipients`,
+        message: `Emails successfully dispatched to ${result.successCount} recipients`,
         ...result,
       }),
       { status: 200 }

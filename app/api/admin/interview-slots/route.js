@@ -49,6 +49,12 @@ export async function GET(req) {
     let query = db.collection("interview_slots");
 
     if (department && department !== "All") {
+      if (!canAccessDepartment(session.user, department, roleConfig)) {
+        return NextResponse.json(
+          { success: false, message: "Forbidden: You do not have permission to view interview slots for this department" },
+          { status: 403 }
+        );
+      }
       const slug = department.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
       query = query.where("departmentSlug", "==", slug);
     }
@@ -72,8 +78,8 @@ export async function GET(req) {
 
     // Filter slots for dept_managers to only their assigned departments
     let filteredSlots = slots;
-    if (userRole.role === "dept_manager" && userRole.departments.length > 0) {
-      filteredSlots = slots.filter((s) => userRole.departments.includes(s.department));
+    if (userRole.role === "dept_manager") {
+      filteredSlots = slots.filter((s) => canAccessDepartment(session.user, s.department, roleConfig));
     }
 
     return NextResponse.json({ success: true, data: filteredSlots });
@@ -162,21 +168,9 @@ export async function POST(req) {
     }
 
     const deptSlug = department.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
-    const batch = db.batch();
-    const generatedSlots = [];
 
-    // Read existing slots for the date and department to preserve existing candidate bookings
-    const existingSnap = await db
-      .collection("interview_slots")
-      .where("departmentSlug", "==", deptSlug)
-      .where("date", "==", date.trim())
-      .get();
-    const existingMap = new Map();
-    (existingSnap?.docs || []).forEach((doc) => {
-      existingMap.set(doc.id, doc.data());
-    });
-
-    // Break cumulative time range [n, m] into 15-minute meeting slots
+    // Precalculate slot metadata
+    const slotConfigs = [];
     for (let cur = startMinutes; cur + 15 <= endMinutes; cur += 15) {
       const sH = Math.floor(cur / 60);
       const sM = cur % 60;
@@ -188,35 +182,51 @@ export async function POST(req) {
       const slotLabel = `${format12h(slotStart)} - ${format12h(slotEnd)}`;
       const slotId = `slot_${deptSlug}_${date.replace(/[^a-zA-Z0-9]/g, "")}_${pad(sH)}${pad(sM)}`;
 
-      const existing = existingMap.get(slotId);
-      const isAlreadyBooked = Boolean(existing && (existing.status === "booked" || existing.bookedBy));
-
-      const slotDoc = {
+      slotConfigs.push({
         slotId,
-        department: department.trim(),
-        departmentSlug: deptSlug,
-        date: date.trim(),
-        startTime: slotStart,
-        endTime: slotEnd,
-        durationMinutes: 15,
+        slotStart,
+        slotEnd,
         slotLabel,
-        meetingLink: meetingLink ? String(meetingLink).trim() : (existing?.meetingLink || ""),
-        status: isAlreadyBooked ? existing.status : "available",
-        bookedBy: isAlreadyBooked ? existing.bookedBy : null,
-        candidateName: isAlreadyBooked ? existing.candidateName : null,
-        applicationId: isAlreadyBooked ? existing.applicationId : null,
-        bookedAt: isAlreadyBooked ? existing.bookedAt : null,
-        createdAt: existing?.createdAt || new Date().toISOString(),
-        createdBy: session.user.email,
-      };
-
-      const docRef = db.collection("interview_slots").doc(slotId);
-      // Preserve existing booking fields when slot already exists
-      batch.set(docRef, slotDoc, { merge: true });
-      generatedSlots.push(slotDoc);
+        docRef: db.collection("interview_slots").doc(slotId),
+      });
     }
 
-    await batch.commit();
+    const generatedSlots = [];
+    await db.runTransaction(async (t) => {
+      // 1. Transaction Read Phase: re-read every slot inside the transaction
+      const slotSnaps = await Promise.all(
+        slotConfigs.map((cfg) => t.get(cfg.docRef))
+      );
+
+      // 2. Transaction Write Phase: construct and write docs preserving candidate bookings
+      slotConfigs.forEach((cfg, idx) => {
+        const snap = slotSnaps[idx];
+        const existing = snap?.exists ? snap.data() : null;
+        const isAlreadyBooked = Boolean(existing && (existing.status === "booked" || existing.bookedBy));
+
+        const slotDoc = {
+          slotId: cfg.slotId,
+          department: department.trim(),
+          departmentSlug: deptSlug,
+          date: date.trim(),
+          startTime: cfg.slotStart,
+          endTime: cfg.slotEnd,
+          durationMinutes: 15,
+          slotLabel: cfg.slotLabel,
+          meetingLink: meetingLink ? String(meetingLink).trim() : (existing?.meetingLink || ""),
+          status: isAlreadyBooked ? existing.status : "available",
+          bookedBy: isAlreadyBooked ? existing.bookedBy : null,
+          candidateName: isAlreadyBooked ? existing.candidateName : null,
+          applicationId: isAlreadyBooked ? existing.applicationId : null,
+          bookedAt: isAlreadyBooked ? existing.bookedAt : null,
+          createdAt: existing?.createdAt || new Date().toISOString(),
+          createdBy: session.user.email,
+        };
+
+        t.set(cfg.docRef, slotDoc, { merge: true });
+        generatedSlots.push(slotDoc);
+      });
+    });
 
     return NextResponse.json({
       success: true,

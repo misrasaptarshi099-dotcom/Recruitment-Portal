@@ -25,6 +25,7 @@ export default function DeadlineConfigModal({
   // Current inputs for the selected department
   const [round1Deadline, setRound1Deadline] = useState("");
   const [round2Deadline, setRound2Deadline] = useState("");
+  const [defaultDeadlines, setDefaultDeadlines] = useState({ round1: "", round2: "" });
 
   const formatForInput = (iso) => {
     if (!iso) return "";
@@ -38,6 +39,8 @@ export default function DeadlineConfigModal({
     }
   };
 
+  const allowedDeptsKey = Array.isArray(allowedDepartments) ? allowedDepartments.join(",") : "";
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -50,12 +53,16 @@ export default function DeadlineConfigModal({
           const departmentsConfig = json.data?.departments || {};
           setDeptDeadlinesMap(departmentsConfig);
 
+          const globalR1 = json.data?.round1Deadline || "";
+          const globalR2 = json.data?.round2Deadline || "";
+          setDefaultDeadlines({ round1: globalR1, round2: globalR2 });
+
           // Determine selectable departments:
           // Super admin gets all departments. Dept managers get their allowedDepartments.
           const allDepts = departmentsData.map((d) => d.name);
           const depts = isSuperAdmin
             ? allDepts
-            : allowedDepartments.length > 0
+            : (allowedDepartments && allowedDepartments.length > 0)
             ? allowedDepartments
             : json.allowedDepartments || allDepts;
 
@@ -67,8 +74,8 @@ export default function DeadlineConfigModal({
 
           // Populate inputs for initial department
           const currentConfig = departmentsConfig[initialDept] || {};
-          setRound1Deadline(formatForInput(currentConfig.round1Deadline || json.data?.round1Deadline));
-          setRound2Deadline(formatForInput(currentConfig.round2Deadline || json.data?.round2Deadline));
+          setRound1Deadline(formatForInput(currentConfig.round1Deadline || globalR1));
+          setRound2Deadline(formatForInput(currentConfig.round2Deadline || globalR2));
         }
       } catch (err) {
         console.error("Error loading deadlines:", err);
@@ -78,14 +85,14 @@ export default function DeadlineConfigModal({
     }
 
     fetchDeadlines();
-  }, [isOpen, isSuperAdmin, allowedDepartments]);
+  }, [isOpen, isSuperAdmin, allowedDeptsKey]);
 
   // When selected department changes, switch inputs to that department's deadlines
   const handleDepartmentChange = (deptName) => {
     setSelectedDept(deptName);
     const config = deptDeadlinesMap[deptName] || {};
-    setRound1Deadline(formatForInput(config.round1Deadline));
-    setRound2Deadline(formatForInput(config.round2Deadline));
+    setRound1Deadline(formatForInput(config.round1Deadline || defaultDeadlines.round1));
+    setRound2Deadline(formatForInput(config.round2Deadline || defaultDeadlines.round2));
   };
 
   if (!isOpen) return null;

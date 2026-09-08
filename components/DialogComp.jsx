@@ -31,7 +31,7 @@ export default function DialogComp({ selectedApplicants }) {
         const applicant = selectedApplicants()[index];
         const isShortlisted = shortlistStatus[index];
 
-        if (isShortlisted && applicant.round1MailSent) {
+        if (applicant?.round1MailSent) {
             toast.error("Cannot modify Round 1 decision: Decision email has already been sent to this candidate.");
             return;
         }

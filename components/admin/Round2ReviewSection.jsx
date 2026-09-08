@@ -424,7 +424,7 @@ export default function Round2ReviewSection({ data = [], onDataUpdate, allowedDe
                   const id = candidate._id || candidate.id;
                   const task = candidate.round2Task;
                   const hasSubmitted = Boolean(task?.submissionUrl);
-                  const isCleared = Boolean(candidate.round2Cleared || candidate.status === "round2_cleared");
+                  const isCleared = Boolean(candidate.round2Cleared || candidate.status === "round2_cleared" || candidate.status === "accepted");
                   const isRejected = candidate.status === "rejected";
                   const isMailSent = Boolean(candidate.round2MailSent);
 

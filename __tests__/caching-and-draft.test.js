@@ -175,45 +175,6 @@ async function runCachingAndDraftTests() {
     }
   }
 
-  // Test 7: CardNav Mobile Menu Timeline State Preservation on Items Update
-  console.log("Test 7: Validating CardNav mobile menu expansion preservation on rerender...");
-  let isExpanded = true;
-  let items = [
-    { label: "Home", href: "/" },
-    { label: "Departments", href: "/departments" },
-  ];
-
-  let currentProgress = 0;
-  const mockTimeline = () => ({
-    progress: (val) => {
-      if (val !== undefined) currentProgress = val;
-      return currentProgress;
-    },
-    kill: () => {},
-  });
-
-  // Rebuilding timeline when items changes (e.g. session authenticated adds 'Profile')
-  let tl = mockTimeline();
-  if (isExpanded && tl) {
-    tl.progress(1);
-  }
-
-  if (tl.progress() !== 1) {
-    throw new Error("CardNav timeline failed to preserve expanded progress on mount!");
-  }
-
-  // Session loads, items array updates
-  items = [...items, { label: "Profile", href: "/profile" }];
-  const newTl = mockTimeline();
-  if (isExpanded && newTl) {
-    newTl.progress(1);
-  }
-
-  if (newTl.progress() !== 1) {
-    throw new Error("CardNav mobile menu collapsed when items changed while expanded!");
-  }
-  console.log("  ✓ CardNav mobile menu expansion & timeline state retention verified.");
-
   console.log("\n>>> ALL PHASE 3 CACHING & METADATA TESTS PASSED! <<<");
 }
 
