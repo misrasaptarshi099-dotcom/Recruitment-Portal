@@ -1,21 +1,13 @@
-require("dotenv").config();
-import nodemailer from "nodemailer";
 import { reviews } from "@/constants";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isUserAdmin, isInstitutionalEmail } from "@/lib/security";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { connect } from "@/lib/db";
+import { loadRoleConfig } from "@/lib/admin-auth";
+import { sendBatchAnnouncementEmail } from "@/lib/mailer";
 
 export const dynamic = "force-dynamic";
-
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USERNAME,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-});
 
 export async function POST(req) {
   try {
@@ -48,7 +40,10 @@ export async function POST(req) {
       );
     }
 
-    if (!isUserAdmin(session.user)) {
+    const db = await connect();
+    const roleConfig = await loadRoleConfig(db);
+
+    if (!isUserAdmin(session.user, roleConfig)) {
       return new Response(
         JSON.stringify({ error: "Forbidden: Only administrators can dispatch recruitment emails" }),
         { status: 403 }
@@ -79,61 +74,57 @@ export async function POST(req) {
       );
     }
 
-    // 4. Recipient Allowlist Verification against Database
-    // Prevents sending arbitrary phishing or spam to non-applicant email addresses
-    const db = await connect();
-    const recipientEmails = recipients.map((r) => r.Email?.toLowerCase().trim()).filter(Boolean);
+    // 4. Recipient Normalization & Allowlist Verification
+    const normalizedRecipients = recipients.map((r) => {
+      const email = (r.Email || r.email || "").toLowerCase().trim();
+      return {
+        ...r,
+        Email: email,
+      };
+    });
 
-    // Ensure all emails are institutional or valid
-    for (const email of recipientEmails) {
-      if (!isInstitutionalEmail(email)) {
+    for (const r of normalizedRecipients) {
+      if (!r.Email || !isInstitutionalEmail(r.Email)) {
         return new Response(
-          JSON.stringify({ error: `Unauthorized external recipient address: ${email}` }),
+          JSON.stringify({ error: `Unauthorized external recipient address: ${r.Email || "missing"}` }),
           { status: 400 }
         );
       }
     }
 
-    // 5. Secure Email Dispatch
-    for (const recipient of recipients) {
-      let depart = recipient.Department;
-      if (depart === "Video Editing") {
-        depart = "Photography";
-      }
-      const dept = reviews.find((item) => item.name === depart);
+    // 5. Secure Email Dispatch via central mailer
+    const result = await sendBatchAnnouncementEmail({
+      recipients: normalizedRecipients,
+      subject: String(payloadData.subject).slice(0, 150),
+      bodyTemplate: payloadData.body,
+    });
 
-      let deptName = dept?.name || recipient.Department || "GDG Department";
-      if (deptName === "Web Development" || deptName === "App Development") {
-        deptName = "Development Department";
-      }
-      if (deptName === "Photography" || deptName === "Video Editing") {
-        deptName = "Photography & Video Editing Department";
-      }
+    if (result.simulated) {
+      return new Response(
+        JSON.stringify({
+          message: `Emails successfully simulated for ${normalizedRecipients.length} recipients (Dry Run)`,
+          ...result,
+        }),
+        { status: 200 }
+      );
+    }
 
-      let emailBody = payloadData.body
-        .replace(/#name/g, recipient.Name || "Candidate")
-        .replace(/#dept/g, deptName);
-
-      const mailOptions = {
-        from: process.env.EMAIL_USERNAME,
-        to: recipient.Email,
-        subject: String(payloadData.subject).slice(0, 150),
-        html: `
-          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            ${emailBody}
-          </div>
-        `,
-      };
-
-      if (process.env.EMAIL_USERNAME && process.env.EMAIL_PASSWORD) {
-        await transporter.sendMail(mailOptions);
-      } else {
-        console.log(`[DRY RUN - EMAIL DISPATCH] To: ${recipient.Email}, Subject: ${mailOptions.subject}`);
-      }
+    if (!result.success) {
+      const status = result.successCount > 0 ? 207 : 500;
+      return new Response(
+        JSON.stringify({
+          error: `Email delivery failed for ${result.failCount} recipient(s)${result.successCount > 0 ? ` (${result.successCount} succeeded)` : ""}`,
+          ...result,
+        }),
+        { status }
+      );
     }
 
     return new Response(
-      JSON.stringify({ message: `Emails successfully dispatched to ${recipients.length} recipients` }),
+      JSON.stringify({
+        message: `Emails successfully dispatched to ${result.successCount} recipients`,
+        ...result,
+      }),
       { status: 200 }
     );
   } catch (error) {
@@ -144,3 +135,4 @@ export async function POST(req) {
     );
   }
 }
+

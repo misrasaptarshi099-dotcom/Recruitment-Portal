@@ -22,24 +22,38 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 
-let frameworks = [];
+let allFrameworks = [];
 
 reviews.forEach(
     (r, index) =>
-        (frameworks[index] = {
+        (allFrameworks[index] = {
             value: r.name,
             label: r.name,
         })
 );
 
-frameworks.push({
+allFrameworks.push({
     value: "Video Editing",
     label: "Video Editing",
 });
 
-export default function FilterDepartment({ filterFunc }) {
+/**
+ * FilterDepartment component.
+ * @param {object} props
+ * @param {function} props.filterFunc - Callback when department is selected.
+ * @param {string[]|null} [props.allowedDepartments] - If provided, only show these departments. Null = show all.
+ */
+export default function FilterDepartment({ filterFunc, allowedDepartments }) {
     const [open, setOpen] = React.useState(false);
     const [value, setValue] = React.useState("");
+
+    // Filter frameworks list based on allowed departments (for dept_managers)
+    const frameworks = React.useMemo(() => {
+        if (!allowedDepartments || allowedDepartments.length === 0) {
+            return allFrameworks;
+        }
+        return allFrameworks.filter((f) => allowedDepartments.includes(f.value));
+    }, [allowedDepartments]);
 
     return (
         <Popover open={open} onOpenChange={setOpen}>

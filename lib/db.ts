@@ -3,14 +3,19 @@ import { getFirestore } from "firebase-admin/firestore";
 import net from "net";
 import { localDb } from "./local-store";
 
-if (process.env.NODE_ENV !== "production") {
+// When live credentials exist, ensure we never connect to the emulator.
+// When no credentials exist in dev, fall back to emulator/local store.
+if (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+  delete process.env.FIRESTORE_EMULATOR_HOST;
   process.env.METADATA_SERVER_DETECTION = process.env.METADATA_SERVER_DETECTION || "none";
-  if (!process.env.FIREBASE_CLIENT_EMAIL && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+} else if (process.env.NODE_ENV !== "production") {
+  process.env.METADATA_SERVER_DETECTION = process.env.METADATA_SERVER_DETECTION || "none";
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     process.env.FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080";
   }
 }
 
-const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "dwasfw-vitc-rec-portal";
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID;
 const FIREBASE_CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL;
 const FIREBASE_PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY?.replace(
   /\\n/g,
@@ -66,18 +71,28 @@ if (!cached) {
 // Timeout helper to ensure database calls never freeze the server
 const withTimeout = <T>(promise: Promise<T>, ms: number, fallback: () => Promise<T>): Promise<T> => {
   let timer: NodeJS.Timeout;
-  const timeoutPromise = new Promise<T>((resolve) => {
+  const timeoutPromise = new Promise<T>((resolve, reject) => {
     timer = setTimeout(async () => {
       console.warn(`Firestore operation timed out after ${ms}ms, failing over to Local Store`);
-      resolve(await fallback());
+      try {
+        resolve(await fallback());
+      } catch (err) {
+        reject(err);
+      }
     }, ms);
   });
 
   return Promise.race([
-    promise.then((res) => {
-      clearTimeout(timer);
-      return res;
-    }),
+    promise
+      .then((res) => {
+        clearTimeout(timer);
+        return res;
+      })
+      .catch(async (err) => {
+        clearTimeout(timer);
+        console.warn(`Firestore operation failed (${err?.message || err}), failing over to Local Store`);
+        return await fallback();
+      }),
     timeoutPromise,
   ]);
 };
@@ -182,7 +197,9 @@ export const connect = async (): Promise<any> => {
       });
     }
 
-    const app = getApps()[0] || initializeApp(appOptions);
+    const DB_APP_NAME = "data-db";
+    const existingApp = getApps().find((a) => a.name === DB_APP_NAME);
+    const app = existingApp || initializeApp(appOptions, DB_APP_NAME);
     cached.db = getFirestore(app);
     cached.isEmulator = false;
     console.log("Connected to Google Cloud Firestore via service account");

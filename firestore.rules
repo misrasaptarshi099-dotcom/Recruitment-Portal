@@ -13,6 +13,7 @@ service cloud.firestore {
       return isAuthenticated() && (
         request.auth.token.role == 'admin' || 
         request.auth.token.email.lower() in [
+          'misrasaptarshi99@gmail.com',
           'misrasaptarshi999@gmail.com',
           'admin@vitstudent.ac.in'
         ]

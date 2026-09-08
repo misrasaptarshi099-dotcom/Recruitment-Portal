@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isUserAdmin } from "@/lib/security";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { loadRoleConfig, getApplicantDepartment, authorizeDepartmentAccess } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,10 @@ export async function PATCH(req, { params }) {
       );
     }
 
-    if (!isUserAdmin(session.user)) {
+    const db = await connect();
+    const roleConfig = await loadRoleConfig(db);
+
+    if (!isUserAdmin(session.user, roleConfig)) {
       return NextResponse.json(
         { success: false, message: "Forbidden: Administrator privileges required" },
         { status: 403 }
@@ -57,7 +61,6 @@ export async function PATCH(req, { params }) {
     const body = await req.json();
     const shortlisted = Boolean(body.shortlisted);
 
-    const db = await connect();
     const docRef = db.collection("formData").doc(id);
     const snapshot = await docRef.get();
 
@@ -65,6 +68,41 @@ export async function PATCH(req, { params }) {
       return NextResponse.json(
         { success: false, message: "Applicant not found" },
         { status: 404 }
+      );
+    }
+
+    // Department scoping guard
+    const docData = snapshot.data() || {};
+    const applicantDept = docData.Department || docData.department || "";
+    const deptAuth = authorizeDepartmentAccess(session.user, applicantDept, roleConfig);
+    if (!deptAuth.authorized) {
+      return NextResponse.json(
+        { success: false, message: deptAuth.reason },
+        { status: 403 }
+      );
+    }
+
+    const currentData = docData;
+    let appData = {};
+    try {
+      const appSnap = await db.collection("applications").doc(id).get();
+      if (appSnap.exists) {
+        appData = appSnap.data() || {};
+      }
+    } catch {
+      // ignore
+    }
+
+    const isRound1MailSent = Boolean(currentData.round1MailSent || appData.round1MailSent);
+
+    // Decision state lock: Once send mail is pressed, decision state cannot be changed
+    if (isRound1MailSent) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Cannot modify Round 1 decision: Decision email has already been sent to this candidate.",
+        },
+        { status: 409 }
       );
     }
 

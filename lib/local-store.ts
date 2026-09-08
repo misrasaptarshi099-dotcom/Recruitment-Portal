@@ -169,24 +169,30 @@ function createQuery(collectionName: string, items: any[]) {
   };
 }
 
+let transactionQueue: Promise<any> = Promise.resolve();
+
 export const localDb = {
   runTransaction: async (updateFunction: (transaction: any) => Promise<any>) => {
-    // Transaction wrapper ensuring synchronous read-modify-write atomicity
-    const transaction = {
-      get: async (docRef: any) => {
-        return docRef.get();
-      },
-      set: async (docRef: any, data: any, options?: any) => {
-        return docRef.set(data, options);
-      },
-      update: async (docRef: any, patch: any) => {
-        return docRef.update(patch);
-      },
-      delete: async (docRef: any) => {
-        return docRef.delete?.();
-      },
-    };
-    return await updateFunction(transaction);
+    // Transaction wrapper ensuring serialized read-modify-write atomicity across concurrent calls
+    const nextInQueue = transactionQueue.catch(() => {}).then(async () => {
+      const transaction = {
+        get: async (docRef: any) => {
+          return docRef.get();
+        },
+        set: async (docRef: any, data: any, options?: any) => {
+          return docRef.set(data, options);
+        },
+        update: async (docRef: any, patch: any) => {
+          return docRef.update(patch);
+        },
+        delete: async (docRef: any) => {
+          return docRef.delete?.();
+        },
+      };
+      return await updateFunction(transaction);
+    });
+    transactionQueue = nextInQueue;
+    return await nextInQueue;
   },
   collection: (collectionName: string) => {
     return {
@@ -218,19 +224,80 @@ export const localDb = {
               data: () => (found ? { ...found } : null),
             };
           },
-          update: async (patch: any) => {
+          update: async (...args: any[]) => {
             const items = readData(collectionName);
-            const index = items.findIndex((i) => i.id === id || i._id === id);
-            if (index >= 0) {
-              items[index] = {
-                ...items[index],
-                ...patch,
-                shortlisted: patch.shortlisted !== undefined ? patch.shortlisted : items[index].shortlisted,
-                Shortlisted: patch.shortlisted !== undefined ? patch.shortlisted : items[index].Shortlisted,
-                updatedAt: new Date().toISOString(),
-              };
-              writeData(collectionName, items);
+            let index = items.findIndex((i) => i.id === id || i._id === id);
+            if (index === -1) {
+              const newDoc = { id, _id: id, createdAt: new Date().toISOString() };
+              items.push(newDoc);
+              index = items.length - 1;
             }
+
+            const target = items[index];
+
+            const isDeleteTransform = (val: any) =>
+              val &&
+              (val.constructor?.name === "DeleteTransform" ||
+                val._methodName === "FieldValue.delete" ||
+                val === "__DELETE__");
+
+            const applyFieldPath = (segments: string[], value: any) => {
+              if (!segments || segments.length === 0) return;
+              let curr = target;
+              for (let i = 0; i < segments.length - 1; i++) {
+                const seg = segments[i];
+                if (!curr[seg] || typeof curr[seg] !== "object") {
+                  curr[seg] = {};
+                }
+                curr = curr[seg];
+              }
+              const lastKey = segments[segments.length - 1];
+              if (isDeleteTransform(value)) {
+                delete curr[lastKey];
+              } else {
+                curr[lastKey] = value;
+              }
+            };
+
+            // Case A: (fieldPath, value, ...) pairs
+            if (
+              args.length >= 2 &&
+              (typeof args[0] === "string" || args[0]?.constructor?.name === "FieldPath" || Array.isArray(args[0]?.segments))
+            ) {
+              for (let i = 0; i < args.length; i += 2) {
+                const rawPath = args[i];
+                const val = args[i + 1];
+                let segments: string[] = [];
+                if (Array.isArray(rawPath?.segments)) {
+                  segments = rawPath.segments;
+                } else if (typeof rawPath === "string") {
+                  segments = rawPath.split(".").map((s) => s.replace(/^`|`$/g, ""));
+                }
+                applyFieldPath(segments, val);
+              }
+            } else if (args.length === 1 && typeof args[0] === "object" && args[0] !== null) {
+              // Case B: object map { [fieldPathOrKey]: value }
+              const patch = args[0];
+              for (const [k, val] of Object.entries(patch)) {
+                if (k.includes(".")) {
+                  const segments = k.split(".").map((s) => s.replace(/^`|`$/g, ""));
+                  applyFieldPath(segments, val);
+                } else {
+                  if (isDeleteTransform(val)) {
+                    delete target[k];
+                  } else {
+                    target[k] = val;
+                  }
+                }
+              }
+              if (patch.shortlisted !== undefined) {
+                target.shortlisted = patch.shortlisted;
+                target.Shortlisted = patch.shortlisted;
+              }
+            }
+
+            target.updatedAt = new Date().toISOString();
+            writeData(collectionName, items);
             return { writeTime: new Date() };
           },
           set: async (data: any, options?: any) => {

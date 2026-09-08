@@ -22,7 +22,10 @@ const securityHeaders = [
 
 const nextConfig = {
   images: {
-    domains: ["avatar.vercel.sh", "lh3.googleusercontent.com"],
+    remotePatterns: [
+      { protocol: "https", hostname: "avatar.vercel.sh" },
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+    ],
   },
   async headers() {
     return [

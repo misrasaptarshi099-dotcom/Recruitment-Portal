@@ -21,7 +21,7 @@ import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { useSubmissions } from "@/components/SubmissionsProvider";
 import { Send, Loader2, ArrowLeft, CheckCircle2, User, HelpCircle } from "lucide-react";
-import { saveDraftAsync, loadDraftAsync, removeDraftAsync } from "@/lib/draft-store";
+import { saveDraftAsync, loadDraftAsync, removeDraftAsync, createDraftQueue } from "@/lib/draft-store";
 
 const normaliseQuestion = (question) => (
   typeof question === "string"
@@ -173,8 +173,12 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
   // Debounced auto-save draft asynchronously via IndexedDB (prevents main thread stutter)
   const watchedValues = useWatch({ control: form.control });
   const saveTimeoutRef = useRef(null);
-  const activeSavePromiseRef = useRef(Promise.resolve());
+  const draftQueueRef = useRef(null);
   const isSubmittedRef = useRef(false);
+
+  if (!draftQueueRef.current) {
+    draftQueueRef.current = createDraftQueue();
+  }
 
   useEffect(() => {
     if (!isDraftReady || !draftKey || isSubmittedRef.current || isSubmitting) return;
@@ -185,17 +189,14 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
 
     saveTimeoutRef.current = setTimeout(() => {
       if (isSubmittedRef.current) return;
-      const savePromise = (async () => {
-        try {
-          await saveDraftAsync(draftKey, {
-            values: watchedValues,
-            submittedDepartments,
-          });
-        } catch (err) {
+      draftQueueRef.current
+        .enqueue(draftKey, {
+          values: watchedValues,
+          submittedDepartments,
+        })
+        .catch((err) => {
           console.error("Failed to auto-save draft:", err);
-        }
-      })();
-      activeSavePromiseRef.current = savePromise;
+        });
     }, 500);
 
     return () => {
@@ -301,8 +302,9 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
         );
       } else {
         isSubmittedRef.current = true;
+        draftQueueRef.current?.cancel();
         try {
-          await activeSavePromiseRef.current;
+          await draftQueueRef.current?.wait();
         } catch {}
         await removeDraftAsync(draftKey);
         router.push("/departments");

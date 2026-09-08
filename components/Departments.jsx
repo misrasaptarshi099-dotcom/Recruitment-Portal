@@ -11,25 +11,31 @@ export const DepartmentMarqueeCard = ({ id, name, description, tone, icon: Icon 
   return (
     <figure
       className={cn(
-        "relative w-72 sm:w-80 cursor-pointer overflow-hidden rounded-2xl border p-5 transition-all duration-200",
-        "border-border/60 bg-card/60 backdrop-blur-sm hover:border-primary/40 hover:bg-card/90 hover:shadow-lg",
+        "relative w-72 sm:w-80 cursor-pointer overflow-hidden border-2 p-5 transition-all duration-200 select-none",
+        "border-border/70 bg-card hover:border-foreground/80 shadow-pixel-sm hover:shadow-pixel",
         "flex flex-col justify-between"
       )}
     >
+      {/* Top Accent Strip */}
+      <div
+        className="absolute top-0 left-0 right-0 h-1"
+        style={{ backgroundColor: tone || "#3B82F6" }}
+      />
+
       <div>
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-3 mb-3 pt-1">
           <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-sm"
-            style={{ backgroundColor: tone || "#3B82F6" }}
+            className="flex h-10 w-10 shrink-0 items-center justify-center border text-white shadow-sm"
+            style={{ backgroundColor: tone || "#3B82F6", borderColor: tone || "#3B82F6" }}
           >
-            {Icon ? <Icon className="h-5 w-5 fill-current" /> : null}
+            {Icon ? <Icon className="h-5 w-5" /> : null}
           </div>
           <div>
-            <h3 className="text-base font-semibold text-foreground tracking-tight">
+            <h3 className="font-display text-base font-bold text-foreground tracking-tight">
               {name}
             </h3>
-            <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
-              Track
+            <span className="font-display text-[10px] text-muted-foreground uppercase tracking-widest font-semibold block">
+              Track Branch
             </span>
           </div>
         </div>
@@ -39,8 +45,8 @@ export const DepartmentMarqueeCard = ({ id, name, description, tone, icon: Icon 
         </p>
       </div>
 
-      <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-primary">
-        <span>Learn more</span>
+      <div className="mt-4 pt-3 border-t border-border/40 flex items-center justify-between text-xs font-display font-semibold text-primary">
+        <span>Explore Track</span>
         <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
       </div>
     </figure>

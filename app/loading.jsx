@@ -1,16 +1,13 @@
 "use client";
 
-// React import
 import React from "react";
-// Component import
-import DWASFWLoader from "@/components/GDGLoader";
+import DinoRunningLoader from "@/components/DinoRunningLoader";
 
-const loading = () => {
+export default function Loading() {
   return (
-    <div>
-      <DWASFWLoader />
-    </div>
+    <DinoRunningLoader
+      badgeText="MAINFRAME // LOADING_ROUTE"
+      statusMessage="Synchronizing recruitment portal..."
+    />
   );
-};
-
-export default loading;
+}

@@ -10,10 +10,14 @@ export default function SignInButton({ children, callbackURL = "/" }) {
     try {
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/"
+        callbackURL: callbackURL || "/",
+        errorCallbackURL: "/auth/signin",
       });
     } catch (error) {
       console.error("Sign in error:", error);
+      if (typeof window !== "undefined") {
+        window.location.href = `/auth/signin?error=auth_error&reason=${encodeURIComponent(error?.message || "Sign-in failed")}`;
+      }
     }
   };
 

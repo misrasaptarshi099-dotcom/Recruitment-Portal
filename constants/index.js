@@ -152,6 +152,8 @@ export const reviews = [
   },
 ];
 
+export const departmentsData = reviews;
+
 // Questionnaire Data
 export const QuestionnaireData = [
   {
@@ -525,6 +527,33 @@ export const CSV_Header = [
     label: "Questions",
     key: "Questions",
   },
+];
+
+export const CSV_Header_Round2 = [
+  { label: "Name", key: "Name" },
+  { label: "Email", key: "Email" },
+  { label: "Registration Number", key: "RegistrationNumber" },
+  { label: "Phone", key: "Phone" },
+  { label: "Department", key: "Department" },
+  { label: "Preference", key: "Pref" },
+  { label: "Task Deliverable URL", key: "submissionUrl" },
+  { label: "Task Submitted At", key: "submittedAt" },
+  { label: "Task Notes", key: "notes" },
+  { label: "Round 2 Cleared", key: "round2Cleared" },
+  { label: "Status", key: "status" },
+];
+
+export const CSV_Header_Round3 = [
+  { label: "Name", key: "Name" },
+  { label: "Email", key: "Email" },
+  { label: "Registration Number", key: "RegistrationNumber" },
+  { label: "Phone", key: "Phone" },
+  { label: "Department", key: "Department" },
+  { label: "Preference", key: "Pref" },
+  { label: "Interview Slot", key: "slotTime" },
+  { label: "Venue", key: "venue" },
+  { label: "Google Meet Link", key: "meetLink" },
+  { label: "Final Status", key: "status" },
 ];
 
 // Mailing Templates
