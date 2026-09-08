@@ -239,6 +239,32 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
         cleanStr(values["Why do you want to join Organization Name?"] || ""),
     };
 
+    const getFieldValue = (name) => {
+      // 1. Try reading directly from form state
+      try {
+        const val = form.getValues(name);
+        if (typeof val === "string" && val.trim()) return val;
+      } catch {}
+
+      if (!values || !name) return "";
+
+      // 2. Direct top-level lookup
+      if (values[name] !== undefined && typeof values[name] === "string") {
+        return values[name];
+      }
+
+      // 3. Dot-delimited path lookup for React Hook Form's automatic dot-nesting
+      const parts = name.split(".");
+      let cur = values;
+      for (const part of parts) {
+        if (cur == null) break;
+        cur = cur[part];
+      }
+      if (typeof cur === "string") return cur;
+
+      return "";
+    };
+
     const submitDepartment = async (department) => {
       const questions = (
         QuestionnaireData.find(
@@ -255,7 +281,7 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
           Questions: questions.reduce(
             (answers, question) => ({
               ...answers,
-              [question.name]: cleanStr(values[question.name] || ""),
+              [question.name]: cleanStr(getFieldValue(question.name)),
             }),
             {}
           ),
