@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { QuestionnaireData, departmentsData } from "../../../constants/departments-data";
 import { connect } from "../../../lib/db";
+import { redis } from "../../../lib/redis";
 
 export const dynamic = "force-dynamic";
 
@@ -18,15 +19,28 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const requestedDept = searchParams.get("department");
 
-  let customMap = {};
+  let customMap = null;
+  const cacheKey = "recruitment_config:questionnaires";
+
   try {
-    const db = await connect();
-    const docSnap = await db.collection("recruitment_config").doc("questionnaires").get();
-    if (docSnap.exists) {
-      customMap = docSnap.data()?.departments || {};
+    customMap = await redis.get(cacheKey);
+  } catch {}
+
+  if (!customMap || typeof customMap !== "object") {
+    try {
+      const db = await connect();
+      const docSnap = await db.collection("recruitment_config").doc("questionnaires").get();
+      if (docSnap.exists) {
+        customMap = docSnap.data()?.departments || {};
+        await redis.set(cacheKey, customMap, { ex: 3600 });
+      } else {
+        customMap = {};
+        await redis.set(cacheKey, {}, { ex: 300 });
+      }
+    } catch (err) {
+      console.warn("Notice reading questionnaires config from Firestore:", err?.message || err);
+      customMap = {};
     }
-  } catch (err) {
-    console.warn("Notice reading questionnaires config from Firestore:", err?.message || err);
   }
 
   // Merge custom questions on top of QuestionnaireData defaults

@@ -6,6 +6,7 @@ import { isUserAdmin, isSuperAdmin, canAccessDepartment, getUserAdminRole } from
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { loadRoleConfig } from "@/lib/admin-auth";
 import { departmentsData, QuestionnaireData } from "@/constants/departments-data";
+import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
 
@@ -190,6 +191,9 @@ export async function PATCH(req) {
         },
         { merge: true }
       );
+
+    // Invalidate Redis cache
+    await redis.del("recruitment_config:questionnaires");
 
     return NextResponse.json({
       success: true,

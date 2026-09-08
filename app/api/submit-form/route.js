@@ -2,7 +2,7 @@ import { submitApplicationTransaction } from "@/lib/bcnf";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isInstitutionalEmail, sanitizeText } from "@/lib/security";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimit, rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +35,7 @@ export async function POST(req) {
     // 3. Sliding-Window Rate Limiting (5 submissions per 10 minutes per IP / user)
     const clientIp = getClientIp(req);
     const limitKey = `submit_${clientIp}_${userEmail}`;
-    const limit = rateLimit(limitKey, {
+    const limit = await rateLimitAsync(limitKey, {
       maxRequests: 5,
       windowSeconds: 600,
     });

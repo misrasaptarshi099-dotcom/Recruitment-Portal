@@ -27,6 +27,8 @@ if (typeof setInterval !== "undefined") {
   }
 }
 
+import { redis } from "./redis";
+
 export interface RateLimitOptions {
   /** Maximum number of requests allowed in the window */
   maxRequests: number;
@@ -42,6 +44,9 @@ export interface RateLimitResult {
   retryAfter: number;
 }
 
+/**
+ * Synchronous in-memory sliding window rate limiter
+ */
 export function rateLimit(
   identifier: string,
   options: RateLimitOptions = { maxRequests: 10, windowSeconds: 60 }
@@ -77,6 +82,45 @@ export function rateLimit(
     reset: resetSeconds,
     retryAfter: isAllowed ? 0 : resetSeconds,
   };
+}
+
+/**
+ * Distributed Upstash Redis rate limiter with automatic in-memory fallback
+ */
+export async function rateLimitAsync(
+  identifier: string,
+  options: RateLimitOptions = { maxRequests: 10, windowSeconds: 60 }
+): Promise<RateLimitResult> {
+  if (redis.isConfigured()) {
+    try {
+      const key = `rl:${identifier}`;
+      const pipelineRes = await redis.pipeline([
+        ["INCR", key],
+        ["EXPIRE", key, options.windowSeconds, "NX"],
+        ["TTL", key],
+      ]);
+
+      if (Array.isArray(pipelineRes) && pipelineRes.length >= 3 && typeof pipelineRes[0] === "number") {
+        const count = pipelineRes[0];
+        const rawTtl = pipelineRes[2];
+        const ttl = typeof rawTtl === "number" && rawTtl > 0 ? rawTtl : options.windowSeconds;
+        const isAllowed = count <= options.maxRequests;
+
+        return {
+          success: isAllowed,
+          limit: options.maxRequests,
+          remaining: Math.max(0, options.maxRequests - count),
+          reset: ttl,
+          retryAfter: isAllowed ? 0 : Math.max(1, ttl),
+        };
+      }
+    } catch (redisErr: any) {
+      console.warn("Upstash Redis rate limit fallback to memory:", redisErr?.message || redisErr);
+    }
+  }
+
+  // Graceful fallback to in-memory sliding window
+  return rateLimit(identifier, options);
 }
 
 /**

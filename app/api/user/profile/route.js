@@ -5,6 +5,7 @@ import { connect } from "@/lib/db";
 import { departmentsData } from "@/constants/departments-data";
 import { isAdminEmail, isActiveAssignment } from "@/lib/security";
 import { loadRoleConfig, purgeRevokedNonInstitutionalUser } from "@/lib/admin-auth";
+import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
 
@@ -278,16 +279,23 @@ export async function GET() {
       }
     }
 
-    // Fetch global/department recruitment deadlines from config
+    // Fetch global/department recruitment deadlines from cache/config
     let recruitmentDeadlines = {
       round1Deadline: null,
       round2Deadline: null,
       round2Deadlines: {},
     };
     try {
-      const dSnap = await db.collection("recruitment_config").doc("deadlines").get();
-      if (dSnap.exists) {
-        recruitmentDeadlines = { ...recruitmentDeadlines, ...dSnap.data() };
+      const cachedDeadlines = await redis.get("recruitment_config:deadlines");
+      if (cachedDeadlines && typeof cachedDeadlines === "object") {
+        recruitmentDeadlines = { ...recruitmentDeadlines, ...cachedDeadlines };
+      } else {
+        const dSnap = await db.collection("recruitment_config").doc("deadlines").get();
+        if (dSnap.exists) {
+          const dData = dSnap.data() || {};
+          recruitmentDeadlines = { ...recruitmentDeadlines, ...dData };
+          await redis.set("recruitment_config:deadlines", dData, { ex: 300 });
+        }
       }
     } catch (err) {
       console.warn("Notice reading recruitment deadlines:", err?.message || err);
@@ -295,9 +303,15 @@ export async function GET() {
 
     let customRound2Tasks = {};
     try {
-      const r2Snap = await db.collection("recruitment_config").doc("round2_tasks").get();
-      if (r2Snap.exists) {
-        customRound2Tasks = r2Snap.data()?.departments || {};
+      const cachedTasks = await redis.get("recruitment_config:round2_tasks");
+      if (cachedTasks && typeof cachedTasks === "object") {
+        customRound2Tasks = cachedTasks;
+      } else {
+        const r2Snap = await db.collection("recruitment_config").doc("round2_tasks").get();
+        if (r2Snap.exists) {
+          customRound2Tasks = r2Snap.data()?.departments || {};
+          await redis.set("recruitment_config:round2_tasks", customRound2Tasks, { ex: 300 });
+        }
       }
     } catch (err) {
       console.warn("Notice reading recruitment round2 tasks:", err?.message || err);

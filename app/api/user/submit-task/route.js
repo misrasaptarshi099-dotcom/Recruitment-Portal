@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { connect } from "@/lib/db";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimit, rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 import { sanitizeText, isValidHttpUrl } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export { isValidHttpUrl };
 export async function POST(req) {
   try {
     const clientIp = getClientIp(req);
-    const limit = rateLimit(`submit_task_${clientIp}`, {
+    const limit = await rateLimitAsync(`submit_task_${clientIp}`, {
       maxRequests: 20,
       windowSeconds: 60,
     });
