@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx __tests__/bcnf.test.js && tsx __tests__/security.test.js && tsx __tests__/caching-and-draft.test.js && tsx __tests__/profile-and-task.test.js && tsx __tests__/questionnaire-and-task-config.test.js"
+    "test": "tsx __tests__/bcnf.test.js && tsx __tests__/security.test.js && tsx __tests__/caching-and-draft.test.js && tsx __tests__/profile-and-task.test.js && tsx __tests__/questionnaire-and-task-config.test.js",
+    "test:upstash": "tsx --env-file=.env.local test-upstash-rate-limit.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

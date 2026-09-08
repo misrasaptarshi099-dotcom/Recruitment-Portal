@@ -124,6 +124,14 @@ export const redis = {
   },
 
   /**
+   * Get remaining time-to-live in seconds on a key
+   */
+  async ttl(key: string): Promise<number> {
+    const res = await executeCommand<number>(["TTL", key]);
+    return typeof res === "number" ? res : -1;
+  },
+
+  /**
    * Run a batch of commands atomically in a single network round-trip via pipeline
    */
   async pipeline(commands: (string | number)[][]): Promise<any[]> {
