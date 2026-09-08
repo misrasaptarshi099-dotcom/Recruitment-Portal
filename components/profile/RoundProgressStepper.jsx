@@ -129,8 +129,10 @@ export default function RoundProgressStepper({
     <>
       <div className={cn("grid grid-cols-1 md:grid-cols-3 gap-3", className)}>
         {roundList.map((round) => {
-          const cfg = statusConfigs[round.status] || statusConfigs.locked;
-          const Icon = cfg.icon;
+          const isDeadlinePassed = Boolean(
+            round.isDeadlinePassed ||
+            (round.deadline && !isNaN(Date.parse(round.deadline)) && Date.now() > new Date(round.deadline).getTime())
+          );
           const isLocked = round.status === "locked";
           const isActionRequired = round.status === "pending_submission";
           const isSubmitted = round.status === "submitted";
@@ -138,13 +140,25 @@ export default function RoundProgressStepper({
           const isScheduled = round.status === "scheduled";
           const isAwaitingSlot = round.status === "awaiting_schedule";
 
+          let cfg = statusConfigs[round.status] || statusConfigs.locked;
+          if (round.key === "round2" && isActionRequired && isDeadlinePassed) {
+            cfg = {
+              label: "CLOSED",
+              color: "text-rose-400 border-rose-500/40 bg-rose-500/10",
+              icon: Lock,
+            };
+          }
+          const Icon = cfg.icon;
+
           return (
             <div
               key={round.key}
               className={cn(
                 "p-3.5 sm:p-4 border transition-all duration-200 bg-background/50 flex flex-col justify-between min-h-[120px] rounded-none",
-                isActionRequired
+                isActionRequired && !isDeadlinePassed
                   ? "border-emerald-500/80 bg-emerald-500/5 shadow-[2px_2px_0px_#10B981]"
+                  : isActionRequired && isDeadlinePassed
+                  ? "border-rose-500/40 bg-rose-500/5 shadow-[2px_2px_0px_rgba(244,63,94,0.15)]"
                   : isSubmitted
                   ? "border-blue-500/50 bg-blue-500/5 shadow-[2px_2px_0px_rgba(59,130,246,0.25)]"
                   : isAwaitingSlot
@@ -232,14 +246,17 @@ export default function RoundProgressStepper({
                             {round.taskPrompt || "Practical Domain Challenge"}
                           </div>
                           {round.deadline && (
-                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground/80">
-                              <Clock className="h-3 w-3 text-amber-400 shrink-0" />
-                              <span>Due: {formatDueDate(round.deadline)}</span>
+                            <div className={cn(
+                              "flex items-center gap-1 text-[10px]",
+                              isDeadlinePassed ? "text-rose-400 font-semibold" : "text-muted-foreground/80"
+                            )}>
+                              <Clock className={cn("h-3 w-3 shrink-0", isDeadlinePassed ? "text-rose-400" : "text-amber-400")} />
+                              <span>{isDeadlinePassed ? "Deadline Expired: " : "Due: "}{formatDueDate(round.deadline)}</span>
                             </div>
                           )}
                         </div>
 
-                        {/* 2 Clean Balanced Action Buttons */}
+                        {/* Action Buttons */}
                         <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-border/40">
                           <TaskBriefModal
                             departmentName={departmentName}
@@ -254,14 +271,24 @@ export default function RoundProgressStepper({
                             </button>
                           </TaskBriefModal>
 
-                          <TaskSubmissionDrawer
-                            applicationId={applicationId}
-                            departmentName={departmentName}
-                            round2Data={round}
-                            onSuccess={onTaskSubmitted}
-                            triggerText="Submit Task"
-                            triggerClassName="px-2 py-1.5 text-[11px] shadow-[2px_2px_0px_#10B981] hover:shadow-none"
-                          />
+                          {isDeadlinePassed ? (
+                            <div
+                              className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-mono font-semibold border border-rose-500/40 bg-rose-500/10 text-rose-400 select-none truncate shadow-[2px_2px_0px_rgba(244,63,94,0.15)]"
+                              title="The deadline has expired. Submissions are closed."
+                            >
+                              <Lock className="h-3 w-3 text-rose-400 shrink-0" />
+                              <span className="truncate"><span className="hidden sm:inline">Submissions </span>Closed</span>
+                            </div>
+                          ) : (
+                            <TaskSubmissionDrawer
+                              applicationId={applicationId}
+                              departmentName={departmentName}
+                              round2Data={round}
+                              onSuccess={onTaskSubmitted}
+                              triggerText="Submit Task"
+                              triggerClassName="px-2 py-1.5 text-[11px] shadow-[2px_2px_0px_#10B981] hover:shadow-none"
+                            />
+                          )}
                         </div>
                       </div>
                     )}
@@ -290,9 +317,18 @@ export default function RoundProgressStepper({
                               <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-70" />
                             </a>
                           </div>
+                          {round.deadline && (
+                            <div className={cn(
+                              "flex items-center gap-1 text-[10px]",
+                              isDeadlinePassed ? "text-muted-foreground/70" : "text-muted-foreground/80"
+                            )}>
+                              <Clock className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+                              <span>{isDeadlinePassed ? "Deadline Passed: " : "Deadline: "}{formatDueDate(round.deadline)}</span>
+                            </div>
+                          )}
                         </div>
 
-                        {/* 2 Clean Balanced Action Buttons for Submitted State */}
+                        {/* Action Buttons for Submitted State */}
                         <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-border/40">
                           <TaskBriefModal
                             departmentName={departmentName}
@@ -307,14 +343,24 @@ export default function RoundProgressStepper({
                             </button>
                           </TaskBriefModal>
 
-                          <TaskSubmissionDrawer
-                            applicationId={applicationId}
-                            departmentName={departmentName}
-                            round2Data={round}
-                            onSuccess={onTaskSubmitted}
-                            triggerText="Update Task"
-                            triggerClassName="px-2 py-1.5 text-[11px] shadow-[2px_2px_0px_rgba(0,0,0,0.3)] hover:shadow-none"
-                          />
+                          {isDeadlinePassed ? (
+                            <div
+                              className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-mono font-semibold border border-border/70 bg-muted/20 text-muted-foreground/80 select-none truncate"
+                              title="Deadline has passed. Further updates are closed."
+                            >
+                              <Lock className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+                              <span className="truncate"><span className="hidden sm:inline">Submissions </span>Closed</span>
+                            </div>
+                          ) : (
+                            <TaskSubmissionDrawer
+                              applicationId={applicationId}
+                              departmentName={departmentName}
+                              round2Data={round}
+                              onSuccess={onTaskSubmitted}
+                              triggerText="Update Task"
+                              triggerClassName="px-2 py-1.5 text-[11px] shadow-[2px_2px_0px_rgba(0,0,0,0.3)] hover:shadow-none"
+                            />
+                          )}
                         </div>
                       </div>
                     )}

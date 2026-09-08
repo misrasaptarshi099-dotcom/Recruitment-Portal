@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { X, Send, Link as LinkIcon, AlertCircle, CheckCircle2, Clock, FileText, ExternalLink } from "lucide-react";
+import { X, Send, Link as LinkIcon, AlertCircle, CheckCircle2, Clock, FileText, ExternalLink, Lock } from "lucide-react";
 import { PixelButton } from "../design-system";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -23,10 +23,19 @@ export default function TaskSubmissionDrawer({
   const [error, setError] = useState(null);
 
   const isAlreadySubmitted = Boolean(round2Data?.submissionUrl);
+  const isDeadlinePassed = Boolean(
+    round2Data?.isDeadlinePassed ||
+    (round2Data?.deadline && !isNaN(Date.parse(round2Data.deadline)) && Date.now() > new Date(round2Data.deadline).getTime())
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+
+    if (isDeadlinePassed) {
+      setError("Submissions are closed as the deadline has passed.");
+      return;
+    }
 
     const trimmedUrl = url.trim();
     if (!trimmedUrl) {
@@ -172,6 +181,13 @@ export default function TaskSubmissionDrawer({
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
+              {isDeadlinePassed && (
+                <div className="flex items-center gap-2 border border-rose-500/50 bg-rose-500/10 p-2.5 text-xs text-rose-400 font-mono">
+                  <Lock className="h-4 w-4 shrink-0" />
+                  <span>Submissions are closed. The deadline for this department challenge has expired.</span>
+                </div>
+              )}
+
               {error && (
                 <div className="flex items-center gap-2 border border-rose-500/50 bg-rose-500/10 p-2.5 text-xs text-rose-400 font-mono">
                   <AlertCircle className="h-4 w-4 shrink-0" />
@@ -190,10 +206,11 @@ export default function TaskSubmissionDrawer({
                   <input
                     type="url"
                     required
+                    disabled={loading || isDeadlinePassed}
                     placeholder="https://github.com/username/project or https://figma.com/file/..."
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    className="w-full rounded-none border-2 border-border/80 bg-background/90 py-2 pl-9 pr-3 text-xs font-mono text-foreground placeholder:text-muted-foreground/60 focus:border-emerald-500 focus:outline-none"
+                    className="w-full rounded-none border-2 border-border/80 bg-background/90 py-2 pl-9 pr-3 text-xs font-mono text-foreground placeholder:text-muted-foreground/60 focus:border-emerald-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
                 <p className="mt-1 text-[10px] font-mono text-muted-foreground">
@@ -208,10 +225,11 @@ export default function TaskSubmissionDrawer({
                 <textarea
                   rows={3}
                   maxLength={1000}
+                  disabled={loading || isDeadlinePassed}
                   placeholder="Briefly describe your stack, setup instructions, or key design decisions..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full rounded-none border-2 border-border/80 bg-background/90 p-2.5 text-xs font-mono text-foreground placeholder:text-muted-foreground/60 focus:border-emerald-500 focus:outline-none resize-none"
+                  className="w-full rounded-none border-2 border-border/80 bg-background/90 p-2.5 text-xs font-mono text-foreground placeholder:text-muted-foreground/60 focus:border-emerald-500 focus:outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -234,10 +252,10 @@ export default function TaskSubmissionDrawer({
                   type="submit"
                   variant="arcade"
                   size="sm"
-                  disabled={loading}
-                  className="font-mono text-xs font-bold"
+                  disabled={loading || isDeadlinePassed}
+                  className="font-mono text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? "TRANSMITTING..." : isAlreadySubmitted ? "UPDATE SUBMISSION" : "CONFIRM SUBMISSION"}
+                  {loading ? "TRANSMITTING..." : isDeadlinePassed ? "SUBMISSIONS CLOSED" : isAlreadySubmitted ? "UPDATE SUBMISSION" : "CONFIRM SUBMISSION"}
                 </PixelButton>
               </div>
             </form>

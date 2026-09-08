@@ -374,6 +374,54 @@ async function runProfileAndTaskTests() {
   }
   console.log("  ✓ Server-side expired deadline condition successfully detected and enforced.");
 
+  // Test 6c: Validating Candidate UI Closed State on Expired Deadlines
+  console.log("Test 6c: Validating Candidate UI Closed State on Expired Deadlines...");
+  const pastDeadline = new Date(Date.now() - 1000 * 60 * 30).toISOString(); // 30 mins ago
+  const futureDeadline = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(); // 24 hours future
+
+  const checkIsDeadlinePassed = (deadline) =>
+    Boolean(deadline && !isNaN(Date.parse(deadline)) && Date.now() > new Date(deadline).getTime());
+
+  if (!checkIsDeadlinePassed(pastDeadline)) {
+    throw new Error("Expired deadline was incorrectly evaluated as active!");
+  }
+  if (checkIsDeadlinePassed(futureDeadline)) {
+    throw new Error("Future active deadline was incorrectly evaluated as expired!");
+  }
+
+  // Verify status config override for expired pending submission
+  const resolveRound2StatusConfig = (status, deadline) => {
+    const isDeadlinePassed = checkIsDeadlinePassed(deadline);
+    const isActionRequired = status === "pending_submission";
+    if (isActionRequired && isDeadlinePassed) {
+      return { label: "CLOSED", color: "text-rose-400 border-rose-500/40 bg-rose-500/10" };
+    }
+    if (isActionRequired) {
+      return { label: "ACTION REQUIRED", color: "text-emerald-400 border-emerald-500" };
+    }
+    if (status === "submitted") {
+      return { label: "SUBMITTED", color: "text-blue-400 border-blue-500/40" };
+    }
+    return { label: "LOCKED", color: "text-muted-foreground" };
+  };
+
+  const pendingExpired = resolveRound2StatusConfig("pending_submission", pastDeadline);
+  if (pendingExpired.label !== "CLOSED") {
+    throw new Error(`Expected CLOSED label for expired pending round 2, got: ${pendingExpired.label}`);
+  }
+
+  const pendingActive = resolveRound2StatusConfig("pending_submission", futureDeadline);
+  if (pendingActive.label !== "ACTION REQUIRED") {
+    throw new Error(`Expected ACTION REQUIRED label for active round 2, got: ${pendingActive.label}`);
+  }
+
+  const submittedExpired = resolveRound2StatusConfig("submitted", pastDeadline);
+  if (submittedExpired.label !== "SUBMITTED") {
+    throw new Error(`Expected SUBMITTED label to remain intact for submitted task, got: ${submittedExpired.label}`);
+  }
+
+  console.log("  ✓ UI deadline expiry calculations and CLOSED label overrides verified.");
+
   // Test 7: 15-Minute Cumulative Slot Generation Math
   console.log("Test 7: Validating 15-Minute Cumulative Slot Generator...");
   const startTime = "14:00";

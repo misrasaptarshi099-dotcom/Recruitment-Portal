@@ -373,6 +373,11 @@ export async function GET() {
         recruitmentDeadlines.round2Deadline ||
         defaultTask.deadline;
 
+      let isR2DeadlinePassed = false;
+      if (effectiveR2Deadline && !isNaN(Date.parse(effectiveR2Deadline))) {
+        isR2DeadlinePassed = Date.now() > new Date(effectiveR2Deadline).getTime();
+      }
+
       return {
         applicationId: app.applicationId,
         department: app.department,
@@ -400,6 +405,7 @@ export async function GET() {
             taskDocumentUrl: customTask?.taskDocumentUrl || null,
             taskDocumentTitle: customTask?.taskDocumentTitle || null,
             deadline: effectiveR2Deadline,
+            isDeadlinePassed: isR2DeadlinePassed,
             deliverableTypes: customTask?.deliverableTypes?.length ? customTask.deliverableTypes : defaultTask.deliverableTypes,
             submissionUrl: app.round2Task?.submissionUrl || null,
             submittedAt: app.round2Task?.submittedAt ? safeToIsoString(app.round2Task.submittedAt) : null,
