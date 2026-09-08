@@ -2,7 +2,7 @@ import { submitApplicationTransaction } from "@/lib/bcnf";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isInstitutionalEmail, sanitizeText } from "@/lib/security";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +35,7 @@ export async function POST(req) {
     // 3. Sliding-Window Rate Limiting (5 submissions per 10 minutes per IP / user)
     const clientIp = getClientIp(req);
     const limitKey = `submit_${clientIp}_${userEmail}`;
-    const limit = rateLimit(limitKey, {
+    const limit = await rateLimitAsync(limitKey, {
       maxRequests: 5,
       windowSeconds: 600,
     });
@@ -76,6 +76,54 @@ export async function POST(req) {
       return new Response(
         JSON.stringify({ message: "Department is required" }),
         { status: 400 }
+      );
+    }
+
+    // Dynamic Departmental Round 1 Deadline Enforcement
+    try {
+      const { connect } = await import("@/lib/db");
+      const db = await connect();
+      const dSnap = await db.collection("recruitment_config").doc("deadlines").get();
+      if (dSnap.exists) {
+        const dData = dSnap.data() || {};
+        let r1Deadline = null;
+        const deptSlug = (Department || "").toLowerCase().trim().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
+
+        if (dData.departments && typeof dData.departments === "object") {
+          for (const [dName, dCfg] of Object.entries(dData.departments)) {
+            const normalizedCfgName = dName.toLowerCase().trim().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
+            if (
+              dName.toLowerCase().trim() === (Department || "").toLowerCase().trim() ||
+              normalizedCfgName === deptSlug
+            ) {
+              r1Deadline = dCfg?.round1Deadline;
+              break;
+            }
+          }
+        }
+
+        r1Deadline = r1Deadline || dData.round1Deadline;
+
+        if (r1Deadline) {
+          const r1Time = new Date(r1Deadline).getTime();
+          if (!isNaN(r1Time) && Date.now() > r1Time) {
+            return new Response(
+              JSON.stringify({
+                message: `The submission deadline for ${Department} has passed (${new Date(r1Deadline).toLocaleString()}). Applications are closed.`,
+                expired: true,
+              }),
+              { status: 403 }
+            );
+          }
+        }
+      }
+    } catch (dErr) {
+      console.error("Could not check dynamic Round 1 deadline:", dErr?.message || dErr);
+      return new Response(
+        JSON.stringify({
+          message: "Service temporarily unavailable. Unable to verify submission deadline. Please try again.",
+        }),
+        { status: 503 }
       );
     }
 

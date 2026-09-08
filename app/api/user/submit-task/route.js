@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { connect } from "@/lib/db";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 import { sanitizeText, isValidHttpUrl } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export { isValidHttpUrl };
 export async function POST(req) {
   try {
     const clientIp = getClientIp(req);
-    const limit = rateLimit(`submit_task_${clientIp}`, {
+    const limit = await rateLimitAsync(`submit_task_${clientIp}`, {
       maxRequests: 20,
       windowSeconds: 60,
     });
@@ -80,6 +80,60 @@ export async function POST(req) {
       return NextResponse.json(
         { error: "Cannot submit task: Round 1 has not been cleared yet" },
         { status: 400 }
+      );
+    }
+
+    // Server-Side Deadline Enforcement
+    const department = (appData.department || appData.Department || "").trim();
+    const deptSlug = (appData.departmentSlug || department.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_")).trim();
+
+    try {
+      let r2Deadline = null;
+      const dSnap = await db.collection("recruitment_config").doc("deadlines").get();
+      if (dSnap.exists) {
+        const dData = dSnap.data() || {};
+        if (dData.departments && typeof dData.departments === "object") {
+          for (const [dName, dCfg] of Object.entries(dData.departments)) {
+            const normalizedCfgName = dName.toLowerCase().trim().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
+            if (
+              dName.toLowerCase().trim() === department.toLowerCase().trim() ||
+              normalizedCfgName === deptSlug
+            ) {
+              r2Deadline = dCfg?.round2Deadline;
+              break;
+            }
+          }
+        }
+
+        r2Deadline =
+          r2Deadline ||
+          dData.round2Deadlines?.[deptSlug] ||
+          dData.round2Deadlines?.[department] ||
+          dData.round2Deadline;
+      }
+
+      if (!r2Deadline && appData.round2Task?.deadline && !isNaN(Date.parse(appData.round2Task.deadline))) {
+        r2Deadline = appData.round2Task.deadline;
+      }
+
+      if (r2Deadline) {
+        const deadlineTime = new Date(r2Deadline).getTime();
+        if (!isNaN(deadlineTime) && Date.now() > deadlineTime) {
+          return NextResponse.json(
+            {
+              error: `Submission rejected: The deadline for ${department || "this department"} Round 2 task was ${new Date(r2Deadline).toLocaleString()}. Submissions are now closed.`,
+              deadline: r2Deadline,
+              expired: true,
+            },
+            { status: 403 }
+          );
+        }
+      }
+    } catch (deadlineErr) {
+      console.error("Could not verify Round 2 task deadline:", deadlineErr?.message || deadlineErr);
+      return NextResponse.json(
+        { error: "Service temporarily unavailable. Unable to verify submission deadline. Please try again." },
+        { status: 503 }
       );
     }
 

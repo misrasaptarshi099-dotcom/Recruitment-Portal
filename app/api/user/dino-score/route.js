@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { connect } from "@/lib/db";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +41,7 @@ export async function GET(req) {
 export async function POST(req) {
   try {
     const clientIp = getClientIp(req);
-    const limit = rateLimit(`dino_score_${clientIp}`, {
+    const limit = await rateLimitAsync(`dino_score_${clientIp}`, {
       maxRequests: 60,
       windowSeconds: 60,
     });

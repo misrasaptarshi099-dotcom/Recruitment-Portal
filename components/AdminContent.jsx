@@ -8,7 +8,9 @@ import Round2ReviewSection from "./admin/Round2ReviewSection";
 import Round3ReviewSection from "./admin/Round3ReviewSection";
 import DeadlineConfigModal from "./admin/DeadlineConfigModal";
 import AdminRoleManagerModal from "./admin/AdminRoleManagerModal";
-import { ShieldAlert, Lock, ArrowRight, Loader2, Layers, FileCode2, Users, CheckCircle2, Calendar, Clock, Crown, Shield, UserCog, Mail } from "lucide-react";
+import QuestionnaireManagerModal from "./admin/QuestionnaireManagerModal";
+import Round2TaskManagerModal from "./admin/Round2TaskManagerModal";
+import { ShieldAlert, Lock, ArrowRight, Loader2, Layers, FileCode2, Users, CheckCircle2, Calendar, Clock, Crown, Shield, UserCog, Mail, HelpCircle } from "lucide-react";
 import { isUserAdmin } from "@/lib/security";
 import DinoRunningLoader from "./DinoRunningLoader";
 import { toast } from "sonner";
@@ -79,6 +81,8 @@ export default function AdminContent({
   const [applicantsData, setApplicantsData] = React.useState(applicants || []);
   const [deadlineModalOpen, setDeadlineModalOpen] = React.useState(false);
   const [roleManagerOpen, setRoleManagerOpen] = React.useState(false);
+  const [questionnaireModalOpen, setQuestionnaireModalOpen] = React.useState(false);
+  const [round2TaskModalOpen, setRound2TaskModalOpen] = React.useState(false);
   const [checkingSmtp, setCheckingSmtp] = React.useState(false);
   const user = session?.user;
 
@@ -313,13 +317,29 @@ export default function AdminContent({
       {/* Render Active Round Section */}
       {activeRound === "round1" && (
         <div className="space-y-3">
-          <div>
-            <span className="text-xs font-semibold text-blue-500 uppercase tracking-wider block">
-              Stage 01 Evaluation · Questionnaire Screening
-            </span>
-            <h2 className="text-xl font-bold tracking-tight text-foreground mt-0.5">
-              Application Review & Shortlisting
-            </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-semibold text-blue-500 uppercase tracking-wider block">
+                Stage 01 Evaluation · Questionnaire Screening
+              </span>
+              <h2 className="text-xl font-bold tracking-tight text-foreground mt-0.5">
+                Application Review & Shortlisting
+              </h2>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setQuestionnaireModalOpen(true)}
+              className="rounded-xl gap-2 border-blue-500/40 text-blue-400 hover:bg-blue-500/10 py-5 px-4 text-xs font-mono shrink-0 shadow-xs cursor-pointer self-start sm:self-auto"
+            >
+              <HelpCircle className="h-4 w-4 text-blue-500" />
+              <div className="text-left">
+                <span className="block font-bold text-foreground">Edit Questions</span>
+                <span className="block text-[10px] text-muted-foreground">
+                  {isSuperAdminProp ? "All 12 Departments" : `${assignedDepartments.join(", ") || "Dept"} Questions`}
+                </span>
+              </div>
+            </Button>
           </div>
           <DataTable
             data={applicantsData}
@@ -331,13 +351,29 @@ export default function AdminContent({
 
       {activeRound === "round2" && (
         <div className="space-y-3">
-          <div>
-            <span className="text-xs font-semibold text-emerald-500 uppercase tracking-wider block">
-              Stage 02 Evaluation · Domain Proficiency Tasks
-            </span>
-            <h2 className="text-xl font-bold tracking-tight text-foreground mt-0.5">
-              Practical Task Submissions & Deliverables
-            </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-semibold text-emerald-500 uppercase tracking-wider block">
+                Stage 02 Evaluation · Domain Proficiency Tasks
+              </span>
+              <h2 className="text-xl font-bold tracking-tight text-foreground mt-0.5">
+                Practical Task Submissions & Deliverables
+              </h2>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRound2TaskModalOpen(true)}
+              className="rounded-xl gap-2 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 py-5 px-4 text-xs font-mono shrink-0 shadow-xs cursor-pointer self-start sm:self-auto"
+            >
+              <FileCode2 className="h-4 w-4 text-emerald-500" />
+              <div className="text-left">
+                <span className="block font-bold text-foreground">Configure Task & Materials</span>
+                <span className="block text-[10px] text-muted-foreground">
+                  Drive Link & Deliverables
+                </span>
+              </div>
+            </Button>
           </div>
           <Round2ReviewSection
             data={applicantsData}
@@ -377,6 +413,22 @@ export default function AdminContent({
       <AdminRoleManagerModal
         isOpen={roleManagerOpen}
         onClose={() => setRoleManagerOpen(false)}
+        allowedDepartments={assignedDepartments}
+        isSuperAdmin={isSuperAdminProp}
+      />
+
+      {/* Round 1 Questionnaire Manager Modal */}
+      <QuestionnaireManagerModal
+        isOpen={questionnaireModalOpen}
+        onClose={() => setQuestionnaireModalOpen(false)}
+        allowedDepartments={assignedDepartments}
+        isSuperAdmin={isSuperAdminProp}
+      />
+
+      {/* Round 2 Task Manager Modal */}
+      <Round2TaskManagerModal
+        isOpen={round2TaskModalOpen}
+        onClose={() => setRound2TaskModalOpen(false)}
         allowedDepartments={assignedDepartments}
         isSuperAdmin={isSuperAdminProp}
       />

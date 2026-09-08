@@ -3,7 +3,7 @@ import { connect, serializeFirestoreData } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isUserAdmin } from "@/lib/security";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 import { loadRoleConfig, getApplicantDepartment, authorizeDepartmentAccess } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export async function PATCH(req, { params }) {
   try {
     // 1. Rate Limiting (60 updates / min)
     const clientIp = getClientIp(req);
-    const limit = rateLimit(`shortlist_${clientIp}`, {
+    const limit = await rateLimitAsync(`shortlist_${clientIp}`, {
       maxRequests: 60,
       windowSeconds: 60,
     });

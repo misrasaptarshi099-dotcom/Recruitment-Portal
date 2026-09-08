@@ -20,8 +20,9 @@ import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { useSubmissions } from "@/components/SubmissionsProvider";
-import { Send, Loader2, ArrowLeft, CheckCircle2, User, HelpCircle } from "lucide-react";
+import { Send, Loader2, ArrowLeft, CheckCircle2, User, HelpCircle, Wifi, WifiOff } from "lucide-react";
 import { saveDraftAsync, loadDraftAsync, removeDraftAsync, createDraftQueue } from "@/lib/draft-store";
+import { Skeleton } from "./ui/skeleton";
 
 const normaliseQuestion = (question) => (
   typeof question === "string"
@@ -39,6 +40,30 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDraftReady, setIsDraftReady] = useState(false);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success("Network connection restored. Auto-saving draft.", {
+        icon: <Wifi className="h-4 w-4 text-emerald-500" />,
+      });
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.warning("Internet disconnected. Offline mode active — draft is saved on this device.", {
+        icon: <WifiOff className="h-4 w-4 text-amber-500" />,
+      });
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   const departmentNames = useMemo(
     () =>
@@ -52,6 +77,34 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
     ? `recruitment-draft:${user.email}:${[...departmentNames].sort().join("|")}`
     : null;
 
+  const [dynamicQuestionnaires, setDynamicQuestionnaires] = useState(QuestionnaireData);
+  const [isQuestionsReady, setIsQuestionsReady] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchLatestQuestions() {
+      try {
+        const res = await fetch("/api/questions");
+        if (res.ok) {
+          const json = await res.json();
+          if (isMounted && Array.isArray(json?.questions) && json.questions.length > 0) {
+            setDynamicQuestionnaires(json.questions);
+          }
+        }
+      } catch (err) {
+        console.warn("Notice: Using default questionnaire data:", err?.message || err);
+      } finally {
+        if (isMounted) {
+          setIsQuestionsReady(true);
+        }
+      }
+    }
+    fetchLatestQuestions();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const normalizeDeptName = (str) =>
     str ? str.trim().toLowerCase().replace(/\s*\/\s*/g, "/") : "";
 
@@ -60,7 +113,7 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
       ...new Set(
         departmentNames.flatMap((department) =>
           (
-            QuestionnaireData.find(
+            dynamicQuestionnaires.find(
               (item) => normalizeDeptName(item.department) === normalizeDeptName(department)
             )?.questions ?? []
           )
@@ -69,7 +122,7 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
         )
       ),
     ],
-    [departmentNames]
+    [departmentNames, dynamicQuestionnaires]
   );
 
   // Memoize Zod validation schema to avoid reconstructing it on every render
@@ -207,6 +260,13 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
   }, [draftKey, isDraftReady, isSubmitting, submittedDepartments, watchedValues]);
 
   const handleSubmit = async (values) => {
+    if (!isOnline) {
+      toast.error("Network connection offline. Please reconnect before submitting your application.", {
+        icon: <WifiOff className="h-4 w-4 text-amber-500" />,
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage("");
 
@@ -239,9 +299,35 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
         cleanStr(values["Why do you want to join Organization Name?"] || ""),
     };
 
+    const getFieldValue = (name) => {
+      // 1. Try reading directly from form state
+      try {
+        const val = form.getValues(name);
+        if (typeof val === "string" && val.trim()) return val;
+      } catch {}
+
+      if (!values || !name) return "";
+
+      // 2. Direct top-level lookup
+      if (values[name] !== undefined && typeof values[name] === "string") {
+        return values[name];
+      }
+
+      // 3. Dot-delimited path lookup for React Hook Form's automatic dot-nesting
+      const parts = name.split(".");
+      let cur = values;
+      for (const part of parts) {
+        if (cur == null) break;
+        cur = cur[part];
+      }
+      if (typeof cur === "string") return cur;
+
+      return "";
+    };
+
     const submitDepartment = async (department) => {
       const questions = (
-        QuestionnaireData.find(
+        dynamicQuestionnaires.find(
           (item) => normalizeDeptName(item.department) === normalizeDeptName(department)
         )?.questions ?? []
       ).map(normaliseQuestion);
@@ -255,7 +341,7 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
           Questions: questions.reduce(
             (answers, question) => ({
               ...answers,
-              [question.name]: cleanStr(values[question.name] || ""),
+              [question.name]: cleanStr(getFieldValue(question.name)),
             }),
             {}
           ),
@@ -319,6 +405,10 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
     }
   };
 
+  if (isLoading || !isDraftReady || !isQuestionsReady) {
+    return <FormSkeleton departmentNames={departmentNames} isOnline={isOnline} />;
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -348,10 +438,60 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
           </div>
         </div>
 
-        <div className="text-xs text-muted-foreground bg-card/60 border border-border/40 p-2.5 rounded-xl self-start sm:self-auto">
-          <span>Auto-saving draft locally</span>
+        {/* Live Network & Draft Status Chip */}
+        <div
+          className={`text-xs px-3 py-2 rounded-xl flex items-center gap-2.5 self-start sm:self-auto border transition-all ${
+            isOnline
+              ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30 shadow-xs"
+              : "text-amber-400 bg-amber-500/10 border-amber-500/40 shadow-xs"
+          }`}
+        >
+          {isOnline ? (
+            <>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <Wifi className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="font-mono text-[11px]">ONLINE · Draft secured locally</span>
+            </>
+          ) : (
+            <>
+              <span className="relative flex h-2 w-2">
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </span>
+              <WifiOff className="h-3.5 w-3.5 text-amber-400" />
+              <span className="font-mono text-[11px] font-semibold">OFFLINE · Saved on device</span>
+            </>
+          )}
         </div>
       </div>
+
+      {/* Sticky Offline Mode Banner */}
+      {!isOnline && (
+        <div className="sticky top-20 z-30 rounded-2xl border border-amber-500/50 bg-zinc-950/95 p-4 backdrop-blur-md shadow-[4px_4px_0px_#F59E0B] text-xs font-mono text-amber-300 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+                <WifiOff className="h-5 w-5 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-amber-200 uppercase tracking-wider">
+                    OFFLINE MODE ACTIVE
+                  </span>
+                  <span className="inline-block px-1.5 py-0.5 text-[9px] bg-amber-500/20 rounded border border-amber-500/40 text-amber-300 font-pixel">
+                    LOCAL CACHE SECURED
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11px] text-amber-300/90 leading-relaxed">
+                  Internet connection lost. Your essays and responses are continuously secured in your browser storage. Submission is paused until network returns.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {errorMessage && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive flex items-center justify-between">
@@ -466,7 +606,7 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
             <DepartmentQuestionsCard
               key={deptName}
               department={deptName}
-              QuestionnaireData={QuestionnaireData}
+              QuestionnaireData={dynamicQuestionnaires}
               form={form}
             />
           ))}
@@ -483,14 +623,23 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !isOnline}
               size="lg"
-              className="rounded-full gap-2 px-8 w-full sm:w-auto shadow-md"
+              className={`rounded-full gap-2 px-8 w-full sm:w-auto shadow-md transition-all ${
+                !isOnline
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/40 cursor-not-allowed hover:bg-amber-500/20"
+                  : ""
+              }`}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Submitting...</span>
+                </>
+              ) : !isOnline ? (
+                <>
+                  <WifiOff className="h-4 w-4" />
+                  <span>Offline (Reconnect to Submit)</span>
                 </>
               ) : (
                 <>
@@ -560,3 +709,86 @@ function DepartmentQuestionsCard({ department, QuestionnaireData, form }) {
     </div>
   );
 }
+
+function FormSkeleton({ departmentNames = [], isOnline = true }) {
+  return (
+    <div className="space-y-8 animate-in fade-in duration-200">
+      {/* Header Skeleton */}
+      <div className="flex flex-col gap-4 border-b border-border/50 pb-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-44" />
+          <Skeleton className="h-8 w-72 sm:w-96" />
+          <div className="flex items-center gap-2 pt-1">
+            <Skeleton className="h-4 w-20" />
+            {departmentNames.length > 0 ? (
+              departmentNames.map((name) => (
+                <Skeleton key={name} className="h-5 w-24 rounded-full" />
+              ))
+            ) : (
+              <>
+                <Skeleton className="h-5 w-24 rounded-full" />
+                <Skeleton className="h-5 w-24 rounded-full" />
+              </>
+            )}
+          </div>
+        </div>
+        <Skeleton className="h-9 w-56 rounded-xl" />
+      </div>
+
+      {/* Section 1: Personal Details Skeleton */}
+      <div className="rounded-2xl border border-border/60 bg-card/60 p-6 sm:p-8 backdrop-blur-sm space-y-6">
+        <div className="flex items-center gap-2 border-b border-border/40 pb-4">
+          <Skeleton className="h-5 w-5 rounded" />
+          <Skeleton className="h-6 w-40" />
+        </div>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-10 w-full rounded-md" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Section 2: General Questions Skeleton */}
+      <div className="rounded-2xl border border-border/60 bg-card/60 p-6 sm:p-8 backdrop-blur-sm space-y-6">
+        <div className="flex items-center gap-2 border-b border-border/40 pb-4">
+          <Skeleton className="h-5 w-5 rounded" />
+          <Skeleton className="h-6 w-48" />
+        </div>
+        <div className="space-y-6">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-4 w-64" />
+              <Skeleton className="h-20 w-full rounded-md" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Section 3: Department Specific Questions Skeleton */}
+      <div className="rounded-2xl border border-border/60 bg-card/60 p-6 sm:p-8 backdrop-blur-sm space-y-6">
+        <div className="flex items-center gap-2 border-b border-border/40 pb-4">
+          <Skeleton className="h-5 w-5 rounded" />
+          <Skeleton className="h-6 w-56" />
+        </div>
+        <div className="space-y-6">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-4 w-72" />
+              <Skeleton className="h-24 w-full rounded-md" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Submit Bar Skeleton */}
+      <div className="flex items-center justify-end gap-4 pt-4">
+        <Skeleton className="h-10 w-24 rounded-full" />
+        <Skeleton className="h-11 w-48 rounded-full" />
+      </div>
+    </div>
+  );
+}
+

@@ -2,7 +2,7 @@ import { reviews } from "@/constants";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isUserAdmin, isInstitutionalEmail } from "@/lib/security";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 import { connect } from "@/lib/db";
 import { loadRoleConfig } from "@/lib/admin-auth";
 import { sendBatchAnnouncementEmail } from "@/lib/mailer";
@@ -13,7 +13,7 @@ export async function POST(req) {
   try {
     // 1. Rate Limiting (5 batch requests / 10 min)
     const clientIp = getClientIp(req);
-    const limit = rateLimit(`send_email_${clientIp}`, {
+    const limit = await rateLimitAsync(`send_email_${clientIp}`, {
       maxRequests: 5,
       windowSeconds: 600,
     });

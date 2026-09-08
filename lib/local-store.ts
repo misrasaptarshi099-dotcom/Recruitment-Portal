@@ -304,7 +304,30 @@ export const localDb = {
             const items = readData(collectionName);
             const index = items.findIndex((i) => i.id === id || i._id === id);
             if (index >= 0 && options?.merge) {
-              items[index] = { ...items[index], ...data };
+              const existing = items[index];
+              const merged = { ...existing, ...data };
+              if (
+                existing.departments &&
+                data.departments &&
+                typeof existing.departments === "object" &&
+                typeof data.departments === "object"
+              ) {
+                const mergedDepts = { ...existing.departments };
+                for (const [deptKey, incomingVal] of Object.entries(data.departments)) {
+                  if (
+                    incomingVal &&
+                    typeof incomingVal === "object" &&
+                    mergedDepts[deptKey] &&
+                    typeof mergedDepts[deptKey] === "object"
+                  ) {
+                    mergedDepts[deptKey] = { ...mergedDepts[deptKey], ...(incomingVal as object) };
+                  } else {
+                    mergedDepts[deptKey] = incomingVal;
+                  }
+                }
+                merged.departments = mergedDepts;
+              }
+              items[index] = merged;
             } else if (index >= 0) {
               items[index] = { ...data, id, _id: id };
             } else {

@@ -5,6 +5,8 @@ import { connect } from "@/lib/db";
 import { departmentsData } from "@/constants/departments-data";
 import { isAdminEmail, isActiveAssignment } from "@/lib/security";
 import { loadRoleConfig, purgeRevokedNonInstitutionalUser } from "@/lib/admin-auth";
+import { redis } from "@/lib/redis";
+import { normalizeDeptSlug } from "@/lib/bcnf";
 
 export const dynamic = "force-dynamic";
 
@@ -278,19 +280,42 @@ export async function GET() {
       }
     }
 
-    // Fetch global/department recruitment deadlines from config
+    // Fetch global/department recruitment deadlines from cache/config
     let recruitmentDeadlines = {
       round1Deadline: null,
       round2Deadline: null,
       round2Deadlines: {},
     };
     try {
-      const dSnap = await db.collection("recruitment_config").doc("deadlines").get();
-      if (dSnap.exists) {
-        recruitmentDeadlines = { ...recruitmentDeadlines, ...dSnap.data() };
+      const cachedDeadlines = await redis.get("recruitment_config:deadlines");
+      if (cachedDeadlines && typeof cachedDeadlines === "object") {
+        recruitmentDeadlines = { ...recruitmentDeadlines, ...cachedDeadlines };
+      } else {
+        const dSnap = await db.collection("recruitment_config").doc("deadlines").get();
+        if (dSnap.exists) {
+          const dData = dSnap.data() || {};
+          recruitmentDeadlines = { ...recruitmentDeadlines, ...dData };
+          await redis.set("recruitment_config:deadlines", dData, { ex: 300 });
+        }
       }
     } catch (err) {
       console.warn("Notice reading recruitment deadlines:", err?.message || err);
+    }
+
+    let customRound2Tasks = {};
+    try {
+      const cachedTasks = await redis.get("recruitment_config:round2_tasks");
+      if (cachedTasks && typeof cachedTasks === "object") {
+        customRound2Tasks = cachedTasks;
+      } else {
+        const r2Snap = await db.collection("recruitment_config").doc("round2_tasks").get();
+        if (r2Snap.exists) {
+          customRound2Tasks = r2Snap.data()?.departments || {};
+          await redis.set("recruitment_config:round2_tasks", customRound2Tasks, { ex: 300 });
+        }
+      }
+    } catch (err) {
+      console.warn("Notice reading recruitment round2 tasks:", err?.message || err);
     }
 
     // Normalize applications into 3-Round Progression Model
@@ -299,6 +324,8 @@ export async function GET() {
       const isTech = TECHNICAL_DEPTS.has(deptLower);
       const deptTone = departmentsData.find((d) => d.name.toLowerCase() === deptLower)?.tone || (isTech ? "#4285F4" : "#0F9D58");
       const defaultTask = DEFAULT_ROUND2_PROMPTS[deptLower] || DEFAULT_ROUND2_PROMPTS.default;
+      const deptSlug = app.departmentSlug || normalizeDeptSlug(app.department || "");
+      const customTask = customRound2Tasks[deptSlug] || customRound2Tasks[app.department];
 
       const isR2Cleared = Boolean(
         app.round2Cleared ||
@@ -362,6 +389,11 @@ export async function GET() {
         recruitmentDeadlines.round2Deadline ||
         defaultTask.deadline;
 
+      let isR2DeadlinePassed = false;
+      if (effectiveR2Deadline && !isNaN(Date.parse(effectiveR2Deadline))) {
+        isR2DeadlinePassed = Date.now() > new Date(effectiveR2Deadline).getTime();
+      }
+
       return {
         applicationId: app.applicationId,
         department: app.department,
@@ -384,10 +416,13 @@ export async function GET() {
             name: "ROUND 02",
             title: "Domain Proficiency Task",
             status: r2Status,
-            description: defaultTask.description,
-            taskPrompt: app.round2Task?.taskPrompt || defaultTask.title,
+            description: customTask?.description || defaultTask.description,
+            taskPrompt: app.round2Task?.taskPrompt || customTask?.title || defaultTask.title,
+            taskDocumentUrl: customTask?.taskDocumentUrl || null,
+            taskDocumentTitle: customTask?.taskDocumentTitle || null,
             deadline: effectiveR2Deadline,
-            deliverableTypes: defaultTask.deliverableTypes,
+            isDeadlinePassed: isR2DeadlinePassed,
+            deliverableTypes: customTask?.deliverableTypes?.length ? customTask.deliverableTypes : defaultTask.deliverableTypes,
             submissionUrl: app.round2Task?.submissionUrl || null,
             submittedAt: app.round2Task?.submittedAt ? safeToIsoString(app.round2Task.submittedAt) : null,
             notes: app.round2Task?.notes || null,

@@ -161,3 +161,98 @@
     transition: none !important;
   }
 }
+
+/* Prominent Custom Scrollbar Utility */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.5) rgba(0, 0, 0, 0.15);
+  overflow-y: auto !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  display: block;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.5);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.8);
+  background-clip: padding-box;
+}
+
+/* Blue Round 1 Modal Scrollbar */
+.custom-scrollbar-blue {
+  scrollbar-color: rgba(59, 130, 246, 0.6) rgba(0, 0, 0, 0.2);
+}
+
+.custom-scrollbar-blue::-webkit-scrollbar-track {
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: 8px;
+}
+
+.custom-scrollbar-blue::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.55);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.custom-scrollbar-blue::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.85);
+  background-clip: padding-box;
+}
+
+/* Emerald Round 2 Modal Scrollbar */
+.custom-scrollbar-emerald {
+  scrollbar-color: rgba(16, 185, 129, 0.6) rgba(0, 0, 0, 0.2);
+}
+
+.custom-scrollbar-emerald::-webkit-scrollbar-track {
+  background: rgba(16, 185, 129, 0.08);
+  border-radius: 8px;
+}
+
+.custom-scrollbar-emerald::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.55);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.custom-scrollbar-emerald::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.85);
+  background-clip: padding-box;
+}
+
+/* Theme Toggle Circular View Transition */
+::view-transition-group(root) {
+  animation-duration: 0.5s;
+  animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+

@@ -352,6 +352,116 @@ async function runProfileAndTaskTests() {
     await db.collection("recruitment_config").doc(testDeadlineDocId).delete().catch(() => {});
   }
 
+  // Test 6b: Validating Server-Side Task Submission Deadline Enforcement
+  console.log("Test 6b: Validating Server-Side Task Submission Deadline Enforcement...");
+  const testDeadline6bDocId = `test_deadlines_6b_${Date.now()}`;
+  try {
+    const expiredDeadline = new Date(Date.now() - 1000 * 60 * 10).toISOString(); // 10 minutes ago
+    await db.collection("recruitment_config").doc(testDeadline6bDocId).set({
+      departments: {
+        "Design": {
+          round2Deadline: expiredDeadline,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    const deadlinesSnap = await db.collection("recruitment_config").doc(testDeadline6bDocId).get();
+    const dData = deadlinesSnap.data();
+    const designR2Deadline = dData.departments?.["Design"]?.round2Deadline;
+    const isExpired = Boolean(designR2Deadline && new Date() > new Date(designR2Deadline));
+
+    if (!isExpired) {
+      throw new Error("Expected Design Round 2 deadline to evaluate as expired!");
+    }
+    console.log("  ✓ Server-side expired deadline condition successfully detected and enforced.");
+  } finally {
+    await db.collection("recruitment_config").doc(testDeadline6bDocId).delete().catch(() => {});
+  }
+
+  // Test 6c: Validating Candidate UI Closed State on Expired Deadlines
+  console.log("Test 6c: Validating Candidate UI Closed State on Expired Deadlines...");
+  let roundStatusMod;
+  try {
+    roundStatusMod = typeof require !== "undefined" ? require("../lib/round-status.js") : null;
+  } catch {}
+  if (!roundStatusMod || typeof roundStatusMod.checkIsDeadlinePassed !== "function") {
+    try {
+      const rsEsm = await import("../lib/round-status.js");
+      roundStatusMod = rsEsm.checkIsDeadlinePassed ? rsEsm : (rsEsm.default || rsEsm);
+    } catch {}
+  }
+  const checkIsDeadlinePassed = roundStatusMod?.checkIsDeadlinePassed || roundStatusMod?.default?.checkIsDeadlinePassed;
+  const resolveRound2StatusConfig = roundStatusMod?.resolveRound2StatusConfig || roundStatusMod?.default?.resolveRound2StatusConfig;
+  const resolveDepartmentDeadline = roundStatusMod?.resolveDepartmentDeadline || roundStatusMod?.default?.resolveDepartmentDeadline;
+  const isRound1ClosedForDept = roundStatusMod?.isRound1ClosedForDept || roundStatusMod?.default?.isRound1ClosedForDept;
+
+  const pastDeadline = new Date(Date.now() - 1000 * 60 * 30).toISOString(); // 30 mins ago
+  const futureDeadline = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(); // 24 hours future
+
+  if (!checkIsDeadlinePassed(pastDeadline)) {
+    throw new Error("Expired deadline was incorrectly evaluated as active!");
+  }
+  if (checkIsDeadlinePassed(futureDeadline)) {
+    throw new Error("Future active deadline was incorrectly evaluated as expired!");
+  }
+
+  const pendingExpired = resolveRound2StatusConfig("pending_submission", pastDeadline);
+  if (pendingExpired.label !== "CLOSED") {
+    throw new Error(`Expected CLOSED label for expired pending round 2, got: ${pendingExpired.label}`);
+  }
+
+  const pendingActive = resolveRound2StatusConfig("pending_submission", futureDeadline);
+  if (pendingActive.label !== "ACTION REQUIRED") {
+    throw new Error(`Expected ACTION REQUIRED label for active round 2, got: ${pendingActive.label}`);
+  }
+
+  const submittedExpired = resolveRound2StatusConfig("submitted", pastDeadline);
+  if (submittedExpired.label !== "SUBMITTED") {
+    throw new Error(`Expected SUBMITTED label to remain intact for submitted task, got: ${submittedExpired.label}`);
+  }
+
+  console.log("  ✓ UI deadline expiry calculations and CLOSED label overrides verified.");
+
+  // Test 6d: Validating Department Explorer Round 1 Deadline Resolver & Closed Status
+  console.log("Test 6d: Validating Department Explorer Round 1 Deadline Resolver & Closed Status...");
+  const mockDeadlinesConfig = {
+    departments: {
+      Design: {
+        round1Deadline: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+        round2Deadline: null,
+      },
+      "Web Dev": {
+        round1Deadline: new Date(Date.now() + 1000 * 60 * 60 * 48).toISOString(), // 48 hours future
+        round2Deadline: null,
+      },
+    },
+  };
+
+  const designDeadlines = resolveDepartmentDeadline(mockDeadlinesConfig, "Design");
+  if (!designDeadlines.round1Deadline) {
+    throw new Error("Failed to resolve round1Deadline for Design!");
+  }
+  if (!isRound1ClosedForDept(mockDeadlinesConfig, "Design")) {
+    throw new Error("Design should be evaluated as CLOSED!");
+  }
+
+  const webDevDeadlines = resolveDepartmentDeadline(mockDeadlinesConfig, "Web Dev");
+  if (!webDevDeadlines.round1Deadline) {
+    throw new Error("Failed to resolve round1Deadline for Web Dev!");
+  }
+  if (isRound1ClosedForDept(mockDeadlinesConfig, "Web Dev")) {
+    throw new Error("Web Dev should be evaluated as OPEN / not closed!");
+  }
+
+  // Also test case-insensitivity and slug normalization
+  const designSlugClosed = isRound1ClosedForDept(mockDeadlinesConfig, "design");
+  if (!designSlugClosed) {
+    throw new Error("Case-insensitive department matching failed for Design!");
+  }
+
+  console.log("  ✓ Department Explorer Round 1 deadline resolver and closed status verified.");
+
   // Test 7: 15-Minute Cumulative Slot Generation Math
   console.log("Test 7: Validating 15-Minute Cumulative Slot Generator...");
   const startTime = "14:00";

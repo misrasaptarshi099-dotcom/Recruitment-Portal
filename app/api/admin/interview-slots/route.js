@@ -3,7 +3,7 @@ import { connect } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isUserAdmin, canAccessDepartment } from "@/lib/security";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimitAsync, getClientIp } from "@/lib/rate-limit";
 import { loadRoleConfig } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -95,7 +95,7 @@ export async function GET(req) {
 export async function POST(req) {
   try {
     const clientIp = getClientIp(req);
-    const limit = rateLimit(`admin_gen_slots_${clientIp}`, {
+    const limit = await rateLimitAsync(`admin_gen_slots_${clientIp}`, {
       maxRequests: 30,
       windowSeconds: 60,
     });

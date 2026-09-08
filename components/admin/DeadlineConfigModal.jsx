@@ -5,6 +5,7 @@ import { PixelCard, PixelButton } from "@/components/design-system";
 import { Calendar, Clock, X, Check, AlertCircle, Save, Layers, FileCode2, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { departmentsData } from "@/constants/departments-data";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function DeadlineConfigModal({
   isOpen,
@@ -174,8 +175,32 @@ export default function DeadlineConfigModal({
           </div>
 
           {loading ? (
-            <div className="py-8 text-center text-xs font-mono text-muted-foreground">
-              Loading current department deadlines...
+            <div role="status" aria-busy="true" className="space-y-4">
+              <span className="sr-only">Loading deadline configuration...</span>
+              {/* Department Selector Skeleton */}
+              <div className="space-y-2 bg-muted/40 p-3.5 rounded-xl border border-border/80">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-3.5 w-32" />
+                  <Skeleton className="h-3 w-40" />
+                </div>
+                <Skeleton className="h-9 w-full rounded-lg" />
+              </div>
+
+              {/* Round Selector Tabs Skeleton */}
+              <div className="flex gap-2 p-1 bg-muted/30 border border-border/60 rounded-xl">
+                <Skeleton className="h-8 flex-1 rounded-lg" />
+                <Skeleton className="h-8 flex-1 rounded-lg" />
+              </div>
+
+              {/* Deadline Input Box Skeleton */}
+              <div className="space-y-2 p-4 rounded-xl border border-border/60 bg-muted/20">
+                <Skeleton className="h-3.5 w-36" />
+                <Skeleton className="h-10 w-full rounded-lg" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+
+              {/* Save Button Skeleton */}
+              <Skeleton className="h-10 w-full rounded-xl" />
             </div>
           ) : (
             <form onSubmit={handleSave} className="space-y-5">

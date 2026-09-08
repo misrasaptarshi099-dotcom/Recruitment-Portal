@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
@@ -14,7 +14,42 @@ import { PixelBadge, PixelButton } from "@/components/design-system";
 export default function DepartmentsListPage() {
   const router = useRouter();
   const [selectedDepartments, setSelectedDepartments] = useState([]);
+  const [closedDepartments, setClosedDepartments] = useState([]);
+  const [isLoadingDeadlines, setIsLoadingDeadlines] = useState(true);
   const { submittedDepartments } = useSubmissions();
+
+  // Load public recruitment deadlines and closed department statuses
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchDeadlines() {
+      try {
+        const res = await fetch("/api/deadlines");
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data?.success && Array.isArray(data.closedDepartments)) {
+            setClosedDepartments(data.closedDepartments);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load recruitment deadlines:", err);
+      } finally {
+        if (isMounted) setIsLoadingDeadlines(false);
+      }
+    }
+    fetchDeadlines();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Prune any closed departments if they were previously selected
+  useEffect(() => {
+    if (closedDepartments.length > 0) {
+      setSelectedDepartments((current) =>
+        current.filter((name) => !closedDepartments.includes(name))
+      );
+    }
+  }, [closedDepartments]);
 
   const remainingSlots = Math.max(0, 2 - submittedDepartments.length);
 
@@ -25,6 +60,11 @@ export default function DepartmentsListPage() {
   }, [selectedDepartments]);
 
   const toggleDepartment = (departmentName) => {
+    if (closedDepartments.includes(departmentName)) {
+      toast.error(`Applications for ${departmentName} have closed.`);
+      return;
+    }
+
     if (submittedDepartments.includes(departmentName)) {
       toast.error(`You have already submitted an application for ${departmentName}.`);
       return;
@@ -51,8 +91,17 @@ export default function DepartmentsListPage() {
     });
   };
 
+  const hasClosedSelected = selectedDepartments.some((d) => closedDepartments.includes(d));
+  const canProceed = selectedDepartments.length > 0 && !hasClosedSelected;
+
   const goToApplication = () => {
     if (!selectedIds.length) return;
+    const closedSelected = selectedDepartments.filter((d) => closedDepartments.includes(d));
+    if (closedSelected.length > 0) {
+      toast.error(`Applications for ${closedSelected.join(", ")} have closed.`);
+      setSelectedDepartments((current) => current.filter((d) => !closedDepartments.includes(d)));
+      return;
+    }
     router.push(`/join/${selectedIds.join("/")}`);
   };
 
@@ -92,7 +141,7 @@ export default function DepartmentsListPage() {
               <PixelButton
                 variant="technical"
                 onClick={goToApplication}
-                disabled={selectedDepartments.length === 0}
+                disabled={!canProceed}
                 size="md"
                 trailingIcon={ArrowRight}
               >
@@ -106,6 +155,7 @@ export default function DepartmentsListPage() {
             departmentsData={reviews}
             selectedDepartments={selectedDepartments}
             submittedDepartments={submittedDepartments}
+            closedDepartments={closedDepartments}
             onToggleDepartment={toggleDepartment}
           />
         </div>

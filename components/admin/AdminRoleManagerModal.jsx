@@ -17,6 +17,7 @@ import {
   Building2,
 } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AdminRoleManagerModal({
   isOpen,
@@ -294,9 +295,36 @@ export default function AdminRoleManagerModal({
             </div>
 
             {loading && assignmentEntries.length === 0 ? (
-              <div className="flex items-center justify-center py-8 text-xs font-mono text-muted-foreground gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Loading active role assignments...</span>
+              <div role="status" aria-busy="true" className="border border-border/60 rounded-xl overflow-hidden">
+                <span className="sr-only">Loading role assignments...</span>
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-muted/40 border-b border-border/60 text-muted-foreground font-mono uppercase text-[10px]">
+                    <tr>
+                      <th className="py-2.5 px-3">Email</th>
+                      <th className="py-2.5 px-3">Role</th>
+                      <th className="py-2.5 px-3">Departments</th>
+                      <th className="py-2.5 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40 font-mono">
+                    {[...Array(4)].map((_, i) => (
+                      <tr key={i} className="animate-pulse">
+                        <td className="py-3 px-3">
+                          <Skeleton className="h-4 w-40" />
+                        </td>
+                        <td className="py-3 px-3">
+                          <Skeleton className="h-5 w-24 rounded-full" />
+                        </td>
+                        <td className="py-3 px-3">
+                          <Skeleton className="h-4 w-28" />
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <Skeleton className="h-7 w-7 rounded-lg ml-auto" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             ) : assignmentEntries.length === 0 ? (
               <div className="text-center py-8 bg-muted/10 border border-dashed border-border/60 rounded-xl space-y-1">

@@ -5,6 +5,7 @@ import { PixelCard, PixelButton } from "@/components/design-system";
 import { Calendar, Clock, Video, X, Check, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { PixelRunningDino } from "@/components/DinoRunningLoader";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function InterviewSlotPickerModal({
   isOpen,
@@ -135,13 +136,42 @@ export default function InterviewSlotPickerModal({
           </div>
 
           {loading ? (
-            <div className="py-10 text-center space-y-3">
-              <div className="inline-flex items-center justify-center p-3 rounded-xl border border-cyan-500/40 bg-zinc-950 shadow-[2px_2px_0px_#06B6D4]">
-                <PixelRunningDino frame={0} className="h-8 w-8 text-cyan-400 animate-pulse" />
+            <div role="status" aria-busy="true" className="space-y-5">
+              <span className="sr-only">Loading available interview slots...</span>
+              {/* Date Selection Skeletons */}
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-32" />
+                <div className="flex flex-wrap gap-2">
+                  <Skeleton className="h-8 w-28 rounded-lg" />
+                  <Skeleton className="h-8 w-28 rounded-lg" />
+                  <Skeleton className="h-8 w-28 rounded-lg" />
+                </div>
               </div>
-              <p className="text-xs font-mono text-cyan-400">
-                SYNCHRONIZING 15-MIN INTERVIEW SLOTS...
-              </p>
+
+              {/* Slot Cards Grid Skeletons */}
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-48" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {[...Array(6)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="p-3 rounded-xl border border-border/40 bg-muted/20 flex items-center justify-between"
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <Skeleton className="h-3.5 w-3.5 rounded-full" />
+                          <Skeleton className="h-4 w-24 rounded" />
+                        </div>
+                        <Skeleton className="h-2.5 w-14 rounded" />
+                      </div>
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Button Skeleton */}
+              <Skeleton className="h-10 w-full rounded-xl" />
             </div>
           ) : slots.length === 0 ? (
             <div className="py-8 text-center space-y-2 bg-muted/10 border border-dashed border-border/60 rounded-xl p-4">
