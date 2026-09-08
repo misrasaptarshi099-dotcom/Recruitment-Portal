@@ -381,7 +381,21 @@ async function runProfileAndTaskTests() {
 
   // Test 6c: Validating Candidate UI Closed State on Expired Deadlines
   console.log("Test 6c: Validating Candidate UI Closed State on Expired Deadlines...");
-  const { checkIsDeadlinePassed, resolveRound2StatusConfig } = await import("../lib/round-status.js");
+  let roundStatusMod;
+  try {
+    roundStatusMod = typeof require !== "undefined" ? require("../lib/round-status.js") : null;
+  } catch {}
+  if (!roundStatusMod || typeof roundStatusMod.checkIsDeadlinePassed !== "function") {
+    try {
+      const rsEsm = await import("../lib/round-status.js");
+      roundStatusMod = rsEsm.checkIsDeadlinePassed ? rsEsm : (rsEsm.default || rsEsm);
+    } catch {}
+  }
+  const checkIsDeadlinePassed = roundStatusMod?.checkIsDeadlinePassed || roundStatusMod?.default?.checkIsDeadlinePassed;
+  const resolveRound2StatusConfig = roundStatusMod?.resolveRound2StatusConfig || roundStatusMod?.default?.resolveRound2StatusConfig;
+  const resolveDepartmentDeadline = roundStatusMod?.resolveDepartmentDeadline || roundStatusMod?.default?.resolveDepartmentDeadline;
+  const isRound1ClosedForDept = roundStatusMod?.isRound1ClosedForDept || roundStatusMod?.default?.isRound1ClosedForDept;
+
   const pastDeadline = new Date(Date.now() - 1000 * 60 * 30).toISOString(); // 30 mins ago
   const futureDeadline = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(); // 24 hours future
 
@@ -411,7 +425,6 @@ async function runProfileAndTaskTests() {
 
   // Test 6d: Validating Department Explorer Round 1 Deadline Resolver & Closed Status
   console.log("Test 6d: Validating Department Explorer Round 1 Deadline Resolver & Closed Status...");
-  const { resolveDepartmentDeadline, isRound1ClosedForDept } = await import("../lib/round-status.js");
   const mockDeadlinesConfig = {
     departments: {
       Design: {

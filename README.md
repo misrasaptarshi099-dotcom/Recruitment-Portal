@@ -233,45 +233,6 @@ EMAIL_FROM="GDG on Campus <chapter-email@gmail.com>"
 
 ---
 
-## Installation and Local Setup
-
-### Prerequisites
-- Node.js 18.17.0 or higher
-- npm or pnpm package manager
-- Google Cloud project with Firestore enabled
-- Upstash Redis instance (free tier compatible)
-
-### Steps
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/misrasaptarshi099-dotcom/Recruitment-Portal.git
-   cd Recruitment-Portal
-   ```
-
-2. Install project dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Configure environment variables:
-   ```bash
-   cp .env.example .env.local
-   # Populate .env.local with your project credentials
-   ```
-
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-5. Open your browser and navigate to:
-   ```
-   http://localhost:3000
-   ```
-
----
-
 ## Testing and Verification
 
 The repository includes comprehensive automated test suites covering normalization, access controls, rate limiting, and candidate lifecycle progression:
@@ -305,4 +266,3 @@ npm run lint
 # Compile optimized production bundle
 npm run build
 ```
-Both commands must exit with code 0 before deploying changes to production.
