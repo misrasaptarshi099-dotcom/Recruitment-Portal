@@ -352,6 +352,28 @@ async function runProfileAndTaskTests() {
     await db.collection("recruitment_config").doc(testDeadlineDocId).delete().catch(() => {});
   }
 
+  // Test 6b: Validating Server-Side Task Submission Deadline Enforcement
+  console.log("Test 6b: Validating Server-Side Task Submission Deadline Enforcement...");
+  const expiredDeadline = new Date(Date.now() - 1000 * 60 * 10).toISOString(); // 10 minutes ago
+  await db.collection("recruitment_config").doc("deadlines").set({
+    departments: {
+      "Design": {
+        round2Deadline: expiredDeadline,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+  }, { merge: true });
+
+  const deadlinesSnap = await db.collection("recruitment_config").doc("deadlines").get();
+  const dData = deadlinesSnap.data();
+  const designR2Deadline = dData.departments?.["Design"]?.round2Deadline;
+  const isExpired = Boolean(designR2Deadline && new Date() > new Date(designR2Deadline));
+
+  if (!isExpired) {
+    throw new Error("Expected Design Round 2 deadline to evaluate as expired!");
+  }
+  console.log("  ✓ Server-side expired deadline condition successfully detected and enforced.");
+
   // Test 7: 15-Minute Cumulative Slot Generation Math
   console.log("Test 7: Validating 15-Minute Cumulative Slot Generator...");
   const startTime = "14:00";

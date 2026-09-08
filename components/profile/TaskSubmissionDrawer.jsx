@@ -2,15 +2,19 @@
 
 import React, { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { X, Send, Link as LinkIcon, AlertCircle, CheckCircle2, Clock, FileText } from "lucide-react";
+import { X, Send, Link as LinkIcon, AlertCircle, CheckCircle2, Clock, FileText, ExternalLink } from "lucide-react";
 import { PixelButton } from "../design-system";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export default function TaskSubmissionDrawer({
   applicationId,
   departmentName,
   round2Data,
   onSuccess,
+  triggerText,
+  triggerClassName,
+  children,
 }) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState(round2Data?.submissionUrl || "");
@@ -74,22 +78,30 @@ export default function TaskSubmissionDrawer({
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        {isAlreadySubmitted ? (
-          <button
-            type="button"
-            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold border border-border/80 bg-muted/30 hover:bg-muted/70 hover:border-emerald-500/60 text-foreground transition-all duration-150 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,0.3)]"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-            <span>Update Submission</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-mono font-bold border-2 border-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-all duration-150 cursor-pointer shadow-[2px_2px_0px_#10B981]"
-          >
-            <Send className="h-3.5 w-3.5 shrink-0" />
-            <span>Submit Task Deliverable</span>
-          </button>
+        {children || (
+          isAlreadySubmitted ? (
+            <button
+              type="button"
+              className={cn(
+                "w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold border border-border/80 bg-muted/30 hover:bg-muted/70 hover:border-emerald-500/60 text-foreground transition-all duration-150 cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,0.3)]",
+                triggerClassName
+              )}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+              <span>{triggerText || "Update Submission"}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={cn(
+                "w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-mono font-bold border-2 border-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-all duration-150 cursor-pointer shadow-[2px_2px_0px_#10B981]",
+                triggerClassName
+              )}
+            >
+              <Send className="h-3.5 w-3.5 shrink-0" />
+              <span>{triggerText || "Submit Task Deliverable"}</span>
+            </button>
+          )
         )}
       </Dialog.Trigger>
 
@@ -143,6 +155,19 @@ export default function TaskSubmissionDrawer({
                   </span>
                 )}
               </div>
+              {round2Data?.taskDocumentUrl && (
+                <div className="pt-2 border-t border-border/40">
+                  <a
+                    href={round2Data.taskDocumentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-bold bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 transition-colors"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                    <span>{round2Data.taskDocumentTitle || "Open Task Brief & Materials (Google Drive)"}</span>
+                  </a>
+                </div>
+              )}
             </div>
 
             {/* Form */}

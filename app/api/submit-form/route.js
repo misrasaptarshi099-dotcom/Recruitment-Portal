@@ -79,6 +79,48 @@ export async function POST(req) {
       );
     }
 
+    // Dynamic Departmental Round 1 Deadline Enforcement
+    try {
+      const { connect } = await import("@/lib/db");
+      const db = await connect();
+      const dSnap = await db.collection("recruitment_config").doc("deadlines").get();
+      if (dSnap.exists) {
+        const dData = dSnap.data() || {};
+        let r1Deadline = null;
+        const deptSlug = (Department || "").toLowerCase().trim().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
+
+        if (dData.departments && typeof dData.departments === "object") {
+          for (const [dName, dCfg] of Object.entries(dData.departments)) {
+            const normalizedCfgName = dName.toLowerCase().trim().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
+            if (
+              dName.toLowerCase().trim() === (Department || "").toLowerCase().trim() ||
+              normalizedCfgName === deptSlug
+            ) {
+              r1Deadline = dCfg?.round1Deadline;
+              break;
+            }
+          }
+        }
+
+        r1Deadline = r1Deadline || dData.round1Deadline;
+
+        if (r1Deadline) {
+          const r1Time = new Date(r1Deadline).getTime();
+          if (!isNaN(r1Time) && Date.now() > r1Time) {
+            return new Response(
+              JSON.stringify({
+                message: `The submission deadline for ${Department} has passed (${new Date(r1Deadline).toLocaleString()}). Applications are closed.`,
+                expired: true,
+              }),
+              { status: 403 }
+            );
+          }
+        }
+      }
+    } catch (dErr) {
+      console.warn("Could not check dynamic Round 1 deadline:", dErr?.message || dErr);
+    }
+
     const regNo = sanitizeText(formFields.RegistrationNumber || "").toUpperCase();
     const regNoRegex = /^\d{2}[A-Z]{3}\d{4}$/;
     if (regNo && !regNoRegex.test(regNo)) {

@@ -52,6 +52,29 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
     ? `recruitment-draft:${user.email}:${[...departmentNames].sort().join("|")}`
     : null;
 
+  const [dynamicQuestionnaires, setDynamicQuestionnaires] = useState(QuestionnaireData);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchLatestQuestions() {
+      try {
+        const res = await fetch("/api/questions");
+        if (res.ok) {
+          const json = await res.json();
+          if (isMounted && Array.isArray(json?.questions) && json.questions.length > 0) {
+            setDynamicQuestionnaires(json.questions);
+          }
+        }
+      } catch (err) {
+        console.warn("Notice: Using default questionnaire data:", err?.message || err);
+      }
+    }
+    fetchLatestQuestions();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const normalizeDeptName = (str) =>
     str ? str.trim().toLowerCase().replace(/\s*\/\s*/g, "/") : "";
 
@@ -60,7 +83,7 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
       ...new Set(
         departmentNames.flatMap((department) =>
           (
-            QuestionnaireData.find(
+            dynamicQuestionnaires.find(
               (item) => normalizeDeptName(item.department) === normalizeDeptName(department)
             )?.questions ?? []
           )
@@ -69,7 +92,7 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
         )
       ),
     ],
-    [departmentNames]
+    [departmentNames, dynamicQuestionnaires]
   );
 
   // Memoize Zod validation schema to avoid reconstructing it on every render
@@ -267,7 +290,7 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
 
     const submitDepartment = async (department) => {
       const questions = (
-        QuestionnaireData.find(
+        dynamicQuestionnaires.find(
           (item) => normalizeDeptName(item.department) === normalizeDeptName(department)
         )?.questions ?? []
       ).map(normaliseQuestion);
@@ -492,7 +515,7 @@ export default function FormComp({ dept1, dept2, isLoading, setIsLoading }) {
             <DepartmentQuestionsCard
               key={deptName}
               department={deptName}
-              QuestionnaireData={QuestionnaireData}
+              QuestionnaireData={dynamicQuestionnaires}
               form={form}
             />
           ))}

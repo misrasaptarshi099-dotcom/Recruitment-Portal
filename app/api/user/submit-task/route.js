@@ -83,6 +83,57 @@ export async function POST(req) {
       );
     }
 
+    // Server-Side Deadline Enforcement
+    const department = (appData.department || appData.Department || "").trim();
+    const deptSlug = (appData.departmentSlug || department.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_")).trim();
+
+    try {
+      const dSnap = await db.collection("recruitment_config").doc("deadlines").get();
+      if (dSnap.exists) {
+        const dData = dSnap.data() || {};
+        let r2Deadline = null;
+
+        if (dData.departments && typeof dData.departments === "object") {
+          for (const [dName, dCfg] of Object.entries(dData.departments)) {
+            const normalizedCfgName = dName.toLowerCase().trim().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
+            if (
+              dName.toLowerCase().trim() === department.toLowerCase().trim() ||
+              normalizedCfgName === deptSlug
+            ) {
+              r2Deadline = dCfg?.round2Deadline;
+              break;
+            }
+          }
+        }
+
+        r2Deadline =
+          r2Deadline ||
+          dData.round2Deadlines?.[deptSlug] ||
+          dData.round2Deadlines?.[department] ||
+          dData.round2Deadline;
+
+        if (!r2Deadline && appData.round2Task?.deadline && !isNaN(Date.parse(appData.round2Task.deadline))) {
+          r2Deadline = appData.round2Task.deadline;
+        }
+
+        if (r2Deadline) {
+          const deadlineTime = new Date(r2Deadline).getTime();
+          if (!isNaN(deadlineTime) && Date.now() > deadlineTime) {
+            return NextResponse.json(
+              {
+                error: `Submission rejected: The deadline for ${department || "this department"} Round 2 task was ${new Date(r2Deadline).toLocaleString()}. Submissions are now closed.`,
+                deadline: r2Deadline,
+                expired: true,
+              },
+              { status: 403 }
+            );
+          }
+        }
+      }
+    } catch (deadlineErr) {
+      console.warn("Could not verify Round 2 task deadline:", deadlineErr?.message || deadlineErr);
+    }
+
     const taskPayload = {
       submissionUrl: rawUrl,
       submittedAt: new Date().toISOString(),

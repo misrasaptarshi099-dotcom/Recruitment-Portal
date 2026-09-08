@@ -293,12 +293,23 @@ export async function GET() {
       console.warn("Notice reading recruitment deadlines:", err?.message || err);
     }
 
+    let customRound2Tasks = {};
+    try {
+      const r2Snap = await db.collection("recruitment_config").doc("round2_tasks").get();
+      if (r2Snap.exists) {
+        customRound2Tasks = r2Snap.data()?.departments || {};
+      }
+    } catch (err) {
+      console.warn("Notice reading recruitment round2 tasks:", err?.message || err);
+    }
+
     // Normalize applications into 3-Round Progression Model
     const applications = Array.from(appMap.values()).map((app) => {
       const deptLower = (app.department || "").toLowerCase();
       const isTech = TECHNICAL_DEPTS.has(deptLower);
       const deptTone = departmentsData.find((d) => d.name.toLowerCase() === deptLower)?.tone || (isTech ? "#4285F4" : "#0F9D58");
       const defaultTask = DEFAULT_ROUND2_PROMPTS[deptLower] || DEFAULT_ROUND2_PROMPTS.default;
+      const customTask = customRound2Tasks[app.departmentSlug] || customRound2Tasks[app.department];
 
       const isR2Cleared = Boolean(
         app.round2Cleared ||
@@ -384,10 +395,12 @@ export async function GET() {
             name: "ROUND 02",
             title: "Domain Proficiency Task",
             status: r2Status,
-            description: defaultTask.description,
-            taskPrompt: app.round2Task?.taskPrompt || defaultTask.title,
+            description: customTask?.description || defaultTask.description,
+            taskPrompt: app.round2Task?.taskPrompt || customTask?.title || defaultTask.title,
+            taskDocumentUrl: customTask?.taskDocumentUrl || null,
+            taskDocumentTitle: customTask?.taskDocumentTitle || null,
             deadline: effectiveR2Deadline,
-            deliverableTypes: defaultTask.deliverableTypes,
+            deliverableTypes: customTask?.deliverableTypes?.length ? customTask.deliverableTypes : defaultTask.deliverableTypes,
             submissionUrl: app.round2Task?.submissionUrl || null,
             submittedAt: app.round2Task?.submittedAt ? safeToIsoString(app.round2Task.submittedAt) : null,
             notes: app.round2Task?.notes || null,
