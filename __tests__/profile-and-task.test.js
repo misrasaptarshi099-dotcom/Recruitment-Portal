@@ -409,6 +409,46 @@ async function runProfileAndTaskTests() {
 
   console.log("  ✓ UI deadline expiry calculations and CLOSED label overrides verified.");
 
+  // Test 6d: Validating Department Explorer Round 1 Deadline Resolver & Closed Status
+  console.log("Test 6d: Validating Department Explorer Round 1 Deadline Resolver & Closed Status...");
+  const { resolveDepartmentDeadline, isRound1ClosedForDept } = await import("../lib/round-status.js");
+  const mockDeadlinesConfig = {
+    departments: {
+      Design: {
+        round1Deadline: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+        round2Deadline: null,
+      },
+      "Web Dev": {
+        round1Deadline: new Date(Date.now() + 1000 * 60 * 60 * 48).toISOString(), // 48 hours future
+        round2Deadline: null,
+      },
+    },
+  };
+
+  const designDeadlines = resolveDepartmentDeadline(mockDeadlinesConfig, "Design");
+  if (!designDeadlines.round1Deadline) {
+    throw new Error("Failed to resolve round1Deadline for Design!");
+  }
+  if (!isRound1ClosedForDept(mockDeadlinesConfig, "Design")) {
+    throw new Error("Design should be evaluated as CLOSED!");
+  }
+
+  const webDevDeadlines = resolveDepartmentDeadline(mockDeadlinesConfig, "Web Dev");
+  if (!webDevDeadlines.round1Deadline) {
+    throw new Error("Failed to resolve round1Deadline for Web Dev!");
+  }
+  if (isRound1ClosedForDept(mockDeadlinesConfig, "Web Dev")) {
+    throw new Error("Web Dev should be evaluated as OPEN / not closed!");
+  }
+
+  // Also test case-insensitivity and slug normalization
+  const designSlugClosed = isRound1ClosedForDept(mockDeadlinesConfig, "design");
+  if (!designSlugClosed) {
+    throw new Error("Case-insensitive department matching failed for Design!");
+  }
+
+  console.log("  ✓ Department Explorer Round 1 deadline resolver and closed status verified.");
+
   // Test 7: 15-Minute Cumulative Slot Generation Math
   console.log("Test 7: Validating 15-Minute Cumulative Slot Generator...");
   const startTime = "14:00";

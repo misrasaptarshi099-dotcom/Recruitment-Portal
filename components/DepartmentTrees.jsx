@@ -22,6 +22,7 @@ import {
   ArrowRight,
   GitBranch,
   Cpu,
+  XCircle,
 } from "lucide-react";
 import { PixelBadge, PixelButton } from "@/components/design-system";
 
@@ -62,10 +63,11 @@ const nonTechDepts = [
    ───────────────────────────────────────────── */
 function TreeBranch({
   dept, index, side, description,
-  isSelected, isSubmitted, onToggle,
+  isSelected, isSubmitted, isClosed = false, onToggle,
 }) {
   const branchRef = useRef(null);
   const Icon = departmentIcons[dept.name] || Layers;
+  const isDisabled = isSubmitted || isClosed;
 
   // Scroll-driven progress for THIS branch
   const { scrollYProgress } = useScroll({
@@ -127,10 +129,12 @@ function TreeBranch({
               className="h-3.5 w-3.5 border-2"
               style={{ borderColor: dept.tone, backgroundColor: isSelected ? dept.tone : "var(--background)" }}
             />
-            <div
-              className="absolute inset-0 animate-ping opacity-30"
-              style={{ backgroundColor: dept.tone }}
-            />
+            {!isClosed && !isSubmitted && (
+              <div
+                className="absolute inset-0 animate-ping opacity-30"
+                style={{ backgroundColor: dept.tone }}
+              />
+            )}
           </div>
         </motion.div>
       </div>
@@ -139,24 +143,29 @@ function TreeBranch({
       <motion.button
         type="button"
         aria-pressed={isSelected}
-        disabled={isSubmitted}
+        disabled={isDisabled}
         style={{
           opacity: cardOpacity,
           scale: cardScale,
           y: cardY,
         }}
-        onClick={() => !isSubmitted && onToggle(dept.name)}
+        onClick={() => !isDisabled && onToggle(dept.name)}
         className={cn(
-          "relative flex-1 p-5 sm:p-6 border-2 transition-colors duration-200 select-none cursor-pointer group/card w-full text-left",
+          "relative flex-1 p-5 sm:p-6 border-2 transition-colors duration-200 select-none group/card w-full text-left",
           isSubmitted
             ? "border-border/40 bg-muted/20 opacity-60 cursor-not-allowed"
+            : isClosed
+            ? "border-rose-500/30 bg-rose-500/5 opacity-70 cursor-not-allowed"
             : isSelected
-            ? "border-foreground bg-foreground/5 shadow-pixel ring-2 ring-primary/20"
-            : "border-border/80 bg-card hover:border-foreground/70 shadow-pixel-sm hover:shadow-pixel"
+            ? "border-foreground bg-foreground/5 shadow-pixel ring-2 ring-primary/20 cursor-pointer"
+            : "border-border/80 bg-card hover:border-foreground/70 shadow-pixel-sm hover:shadow-pixel cursor-pointer"
         )}
       >
         {/* Top accent bar */}
-        <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: dept.tone }} />
+        <div
+          className="absolute top-0 left-0 right-0 h-1.5"
+          style={{ backgroundColor: isClosed ? "#f43f5e" : dept.tone }}
+        />
 
         {/* Header row */}
         <div className="flex items-start justify-between gap-3 mb-3 pt-1">
@@ -189,6 +198,10 @@ function TreeBranch({
               <span className="inline-flex items-center gap-1.5 bg-muted px-2 py-1 font-display text-[10px] font-semibold text-muted-foreground border border-border">
                 <CheckCircle2 className="h-3 w-3 text-emerald-500" /> SUBMITTED
               </span>
+            ) : isClosed ? (
+              <span className="inline-flex items-center gap-1.5 bg-rose-500/10 text-rose-400 px-2 py-1 font-display text-[10px] font-bold border border-rose-500/30">
+                <XCircle className="h-3 w-3 text-rose-500" /> APPLICATIONS CLOSED
+              </span>
             ) : isSelected ? (
               <span className="inline-flex items-center gap-1.5 bg-foreground text-background px-2.5 py-1 font-display text-[10px] font-bold">
                 <CheckCircle2 className="h-3 w-3 text-emerald-400" /> SELECTED
@@ -216,8 +229,18 @@ function TreeBranch({
 
         {/* Footer */}
         <div className="mt-4 pt-3 border-t border-border/40 flex items-center justify-between text-[11px] font-display font-semibold text-muted-foreground">
-          <span>{isSubmitted ? "COMPLETED" : isSelected ? "SLOT FILLED — READY" : "CLICK TO SELECT"}</span>
-          <ArrowRight className="h-3.5 w-3.5 group-hover/card:translate-x-1 transition-transform" />
+          <span>
+            {isSubmitted
+              ? "COMPLETED"
+              : isClosed
+              ? "APPLICATIONS CLOSED"
+              : isSelected
+              ? "SLOT FILLED — READY"
+              : "CLICK TO SELECT"}
+          </span>
+          {!isClosed && !isSubmitted && (
+            <ArrowRight className="h-3.5 w-3.5 group-hover/card:translate-x-1 transition-transform" />
+          )}
         </div>
       </motion.button>
     </div>
@@ -256,6 +279,7 @@ export default function DepartmentTrees({
   departmentsData = [],
   selectedDepartments = [],
   submittedDepartments = [],
+  closedDepartments = [],
   onToggleDepartment,
 }) {
   const treeRef = useRef(null);
@@ -364,6 +388,7 @@ export default function DepartmentTrees({
                       description={getDeptDesc(row.left.name)}
                       isSelected={selectedDepartments.includes(row.left.name)}
                       isSubmitted={submittedDepartments.includes(row.left.name)}
+                      isClosed={closedDepartments.includes(row.left.name)}
                       onToggle={onToggleDepartment}
                     />
                   )}
@@ -378,6 +403,7 @@ export default function DepartmentTrees({
                       description={getDeptDesc(row.right.name)}
                       isSelected={selectedDepartments.includes(row.right.name)}
                       isSubmitted={submittedDepartments.includes(row.right.name)}
+                      isClosed={closedDepartments.includes(row.right.name)}
                       onToggle={onToggleDepartment}
                     />
                   )}
@@ -399,6 +425,7 @@ export default function DepartmentTrees({
                 description={getDeptDesc(dept.name)}
                 isSelected={selectedDepartments.includes(dept.name)}
                 isSubmitted={submittedDepartments.includes(dept.name)}
+                isClosed={closedDepartments.includes(dept.name)}
                 onToggle={onToggleDepartment}
               />
             ))}
@@ -416,6 +443,7 @@ export default function DepartmentTrees({
                 description={getDeptDesc(dept.name)}
                 isSelected={selectedDepartments.includes(dept.name)}
                 isSubmitted={submittedDepartments.includes(dept.name)}
+                isClosed={closedDepartments.includes(dept.name)}
                 onToggle={onToggleDepartment}
               />
             ))}
