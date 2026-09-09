@@ -1,5 +1,7 @@
 # GDG on Campus Recruitment Portal - Technical Architecture and Work Specification
 
+**[Project Overview (README)](./README.md)** | **[Technical Specification & Architecture (WORK.md)](./WORK.md)**
+
 ## 1. Summary
 
 This document serves as an exhaustive technical ledger detailing the complete architectural transformation, system implementations, data models, security hardening, and operational features delivered for the Google Developer Groups (GDG) on Campus Recruitment Portal.

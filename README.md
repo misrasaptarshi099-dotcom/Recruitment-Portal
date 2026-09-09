@@ -1,5 +1,7 @@
 # GDG on Campus Recruitment Portal
 
+**[Project Overview (README)](./README.md)** | **[Technical Specification & Architecture (WORK.md)](./WORK.md)**
+
 Live Deployment: https://recruitment-portal-liart.vercel.app
 
 A modern, full-stack recruitment platform engineered for Google Developer Groups (GDG) on Campus. The system powers end-to-end candidate lifecycle management across twelve technical and creative tracks, featuring a three-round progressive evaluation pipeline, role-based access control, distributed rate limiting, and automated communication dispatch.
@@ -9,6 +11,7 @@ A modern, full-stack recruitment platform engineered for Google Developer Groups
 ## Table of Contents
 
 - [Overview](#overview)
+- [Technical Architecture (WORK.md)](./WORK.md)
 - [Live Deployment](#live-deployment)
 - [System Architecture](#system-architecture)
 - [User Roles and Permissions](#user-roles-and-permissions)
